@@ -41,7 +41,7 @@ Owlbear reads `DBGBCR0_EL1` through `DBGBCR5_EL1` and `DBGWCR0_EL1` through `DBG
 
 Register indices must be compile-time constants for MRS — each register is read with a separate macro expansion, not a runtime loop.
 
-## PAC Key Monitoring
+## PAC Monitoring
 
 On ARMv8.3+ with Pointer Authentication:
 
@@ -49,10 +49,9 @@ On ARMv8.3+ with Pointer Authentication:
 - Signature occupies unused upper bits of 64-bit pointers
 - `PACIA` / `AUTIA` instructions sign/verify
 
-At init, owlbear captures the instruction A-key pair. Periodic checks detect:
+Owlbear checks whether PAC is globally enabled by reading `SCTLR_EL1.EnIA` periodically. If a cheat clears this bit, pointer authentication is disabled entirely and owlbear reports it.
 
-1. **Key substitution**: a cheat replaces the key to forge valid signed pointers
-2. **PAC disabled**: `SCTLR_EL1.EnIA` cleared, disabling authentication entirely
+**Key value comparison is intentionally omitted.** PAC keys are per-process — the kernel assigns unique keys to each task. Reading key registers from a workqueue context returns the kworker's keys, not the game's. Comparing those values produces false positives every check interval.
 
 PAC checks are conditional on `CONFIG_ARM64_PTR_AUTH` and runtime feature detection via `system_supports_address_auth()`. On non-PAC hardware, these checks are no-ops.
 

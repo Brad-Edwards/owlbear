@@ -44,7 +44,7 @@ eBPF and the kernel module serve different purposes:
 **Kernel module:**
 - Full hardware access (MRS/MSR for system registers)
 - Can read debug registers (DBGBCR, DBGBVR, DBGWCR, DBGWVR)
-- Can read PAC keys (APIAKeyHi/Lo_EL1)
+- Can read PAC enable state (SCTLR_EL1.EnIA)
 - Can verify VBAR_EL1 (exception vector table)
 - Runs periodic workqueue for integrity checks
 - Provides chardev for daemon communication

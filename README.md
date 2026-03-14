@@ -1,6 +1,6 @@
 # Owlbear
 
-ARM64 kernel-mode anti-cheat for Linux. Hybrid architecture: kernel module for ARM64 hardware checks (system registers, debug registers, PAC keys) + eBPF for process/memory monitoring. Userspace daemon consumes events from both, runs signature scans, ships telemetry to AWS.
+ARM64 kernel-mode anti-cheat for Linux. Hybrid architecture: kernel module for ARM64 hardware checks (system registers, debug registers, PAC enable state) + eBPF for process/memory monitoring. Userspace daemon consumes events from both, runs signature scans, ships telemetry to AWS.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ ARM64 kernel-mode anti-cheat for Linux. Hybrid architecture: kernel module for A
  +------------------+   |    |                     |
  | Game Process     |   |  DynamoDB (events)       |
  |   | heartbeat    |   |    |                     |
- |   v              |   |  S3 (dashboard)          |
+ |   v              |   |  S3 (artifacts)          |
  | Daemon ----------+-->|                          |
  |   |       HTTPS  |   +--------------------------+
  |   |              |
@@ -39,12 +39,13 @@ ARM64 kernel-mode anti-cheat for Linux. Hybrid architecture: kernel module for A
 | HW debug registers | ARM64 DBGBCR/DBGBVR 0-5, DBGWCR/DBGWVR 0-3 scan | Kernel | Done |
 | System register tamper | SCTLR_EL1/TCR_EL1/MAIR_EL1/MDSCR_EL1 baseline + periodic verify | Kernel | Done |
 | WXN disabled | SCTLR_EL1 bit 19 monitoring | Kernel | Done |
-| PAC key substitution | APIAKeyHi/Lo_EL1 baseline + verify | Kernel | Done |
+| PAC disabled | SCTLR_EL1.EnIA monitoring | Kernel | Done |
 | VBAR_EL1 redirect | Vector table base comparison | Kernel | Done |
 | Unknown kernel modules | Module list walk post-init | Kernel | Done |
+| Cheat binary in memory | Byte-pattern signature scan (hex + wildcards) | Daemon | Done |
+| Policy-based response | Event-type + severity → action mapping | Daemon | Done |
+| Heartbeat anomalies | Frame count freeze/rewind + timeout detection | Daemon | Done |
 | Code modification | `.text` section hash | Daemon | Planned |
-| Cheat binary in memory | Byte-pattern signatures | Daemon | Planned |
-| Behavioral anomalies | Event frequency thresholds + policy engine | Daemon | Planned |
 
 ## Structure
 
@@ -56,14 +57,16 @@ daemon/         Userspace daemon (C)
 game/           Test game (C, ncurses)
 cheats/         Test cheat programs (C)
 platform/       Telemetry receiver (Python, Lambda + DynamoDB)
+signatures/     Cheat signature database
 deploy/         Terraform (catalyst-dev)
+scripts/        Build, provisioning, demo, E2E verification
 research/       Technical research (9 documents)
-tests/          Unit and integration tests
+tests/          Unit and integration tests (57 tests, 5 suites)
 ```
 
 ## Why Hybrid
 
-eBPF cannot access ARM64 system registers (`SCTLR_EL1`, `MDSCR_EL1`), debug registers (`DBGBCR`/`DBGBVR`), or PAC keys (`APIAKey`). A kernel module can. eBPF provides safe, portable, verifier-checked monitoring via LSM hooks and tracepoints. The kernel module handles hardware-specific integrity checks.
+eBPF cannot access ARM64 system registers (`SCTLR_EL1`, `MDSCR_EL1`), debug registers (`DBGBCR`/`DBGBVR`), or PAC enable state. A kernel module can. eBPF provides safe, portable, verifier-checked monitoring via LSM hooks and tracepoints. The kernel module handles hardware-specific integrity checks.
 
 ## Building
 
@@ -71,7 +74,7 @@ eBPF cannot access ARM64 system registers (`SCTLR_EL1`, `MDSCR_EL1`), debug regi
 sudo ./scripts/setup-dev.sh    # Install deps (detects arch)
 make all                       # Build everything
 make kernel                    # Kernel module
-make test                      # Unit tests (13/13)
+make test                      # Unit tests (57 across 5 suites)
 ```
 
 Cross-compile from x86_64:
@@ -85,7 +88,7 @@ make all CROSS_COMPILE=aarch64-linux-gnu- CC=aarch64-linux-gnu-gcc
 |---------|-------|-------|
 | System Registers | Base | MMU/cache/WXN tamper detection |
 | Debug Registers | Base | HW breakpoint detection on game code |
-| PAC | v8.3+ | PAC key substitution detection |
+| PAC | v8.3+ | SCTLR_EL1.EnIA disable detection |
 | BTI | v8.5+ | Branch target verification |
 | MTE | v8.5+ | Documented only (requires HW) |
 

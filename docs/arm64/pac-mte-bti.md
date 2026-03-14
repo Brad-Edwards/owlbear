@@ -16,10 +16,10 @@ ARM64 provides hardware security features with no x86 equivalent. These change w
 **Anti-cheat use:**
 - Return addresses on the stack are signed. ROP chains cannot work without the key.
 - Function pointers in game structs can be signed. Vtable hijacking requires key knowledge.
-- Owlbear captures `APIAKeyHi/Lo_EL1` at init and detects substitution.
-- If `SCTLR_EL1.EnIA` is cleared, PAC is disabled entirely — owlbear detects this.
+- Owlbear monitors `SCTLR_EL1.EnIA` — if cleared, PAC is disabled entirely.
+- Per-process key comparison is not feasible from workqueue context (keys are per-task, reading from kworker returns wrong values).
 
-**Cheat implications:** a cheat cannot forge valid signed pointers without the per-process key. Key extraction requires kernel access. Key substitution is detectable.
+**Cheat implications:** a cheat cannot forge valid signed pointers without the per-process key. Key extraction requires kernel access. Disabling PAC globally is detectable.
 
 **Hardware:** Graviton3 (c7g instances) supports PAC. Graviton2 (t4g, m6g) does not.
 
@@ -56,4 +56,4 @@ ARM64 provides hardware security features with no x86 equivalent. These change w
 | Memory tagging | MTE (v8.5) | None (MPX deprecated) | MTE: limited HW. x86: nothing |
 | Pointer signing | PAC | None | ARM64 unique |
 
-ARM64 has a hardware security advantage for anti-cheat. The combination of PAC + BTI makes control-flow hijacking substantially harder than on x86, where CET adoption remains limited.
+PAC + BTI are deployed on Graviton3. CET (the x86 equivalent) has limited adoption. This gives ARM64 anti-cheat more hardware to work with for control-flow integrity.

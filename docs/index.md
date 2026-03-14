@@ -13,10 +13,10 @@ Hybrid architecture: kernel module for ARM64 hardware integrity checks + eBPF fo
 
 | Component | Role |
 |-----------|------|
-| **Kernel module** (`owlbear.ko`) | ARM64 system register verification, debug register scanning, PAC key monitoring, VBAR integrity, kprobes on ptrace/memory access/module loads |
+| **Kernel module** (`owlbear.ko`) | ARM64 system register verification, debug register scanning, PAC enable-bit monitoring, VBAR integrity, kprobes on ptrace/memory access/module loads |
 | **eBPF programs** | BPF LSM hooks (ptrace deny, /proc/mem deny, mmap monitor), syscall tracepoints (process_vm_readv/writev), kprobe (module load) |
 | **Daemon** (`owlbeard`) | Event consumer from chardev + BPF ringbuf, policy engine, signature scanner, heartbeat tracker, telemetry client |
-| **Platform** (AWS) | Lambda receiver, DynamoDB storage, API Gateway routing, S3 dashboard |
+| **Platform** (AWS) | Lambda receiver, DynamoDB storage, API Gateway routing, S3 verification artifacts |
 
 ## Detection Coverage
 
@@ -32,7 +32,7 @@ Owlbear detects the following cheat techniques:
 | HW debug registers | DBGBCR/DBGBVR periodic scan | — | — |
 | System register tamper | SCTLR/TCR/MAIR/MDSCR verify | — | — |
 | WXN disabled | SCTLR_EL1 bit 19 | — | — |
-| PAC key substitution | APIAKey capture + verify | — | — |
+| PAC disabled | SCTLR_EL1.EnIA monitoring | — | — |
 | VBAR redirect | Vector table base compare | — | — |
 | LD_PRELOAD | — | — | Function pointer integrity |
 | Cheat binary in memory | — | — | Byte-pattern signatures |

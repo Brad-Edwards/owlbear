@@ -11,7 +11,7 @@ Linux provides three primary ways for a process to read another's memory:
 
 1. **`/proc/<pid>/mem`** — file-based interface, requires same UID or `CAP_SYS_PTRACE`
 2. **`process_vm_readv()` / `process_vm_writev()`** — syscall, no ptrace attachment needed
-3. **`ptrace(PTRACE_PEEKDATA, ...)`** — debugger interface (covered in process monitoring)
+3. **`ptrace(PTRACE_PEEKDATA, ...)`** — debugger interface, word-at-a-time reads (covered in process monitoring)
 
 All three must be monitored. A cheat only needs one to work.
 
@@ -23,7 +23,7 @@ Kprobe on `mem_open` (fs/proc/base.c). Extracts the target PID from the proc ino
 
 ### process_vm_readv / process_vm_writev
 
-Kprobes on `__arm64_sys_process_vm_readv` and `__arm64_sys_process_vm_writev`. The first syscall argument (target PID) is extracted from the user-space pt_regs. On ARM64, the syscall wrapper receives a `pt_regs*` in `regs->regs[0]`, and the actual target PID is in `user_regs->regs[0]`.
+Kprobes on `__arm64_sys_process_vm_readv` and `__arm64_sys_process_vm_writev`. The first syscall argument (target PID) is extracted from the pt_regs. On ARM64 kernel 6.1+, `__arm64_sys_*` wrappers pass user pt_regs directly — `regs->regs[0]` IS the first syscall arg (target PID), not a pointer to another pt_regs.
 
 ### PROT_EXEC mmap
 

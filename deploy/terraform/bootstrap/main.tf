@@ -177,7 +177,10 @@ resource "aws_iam_role_policy" "github_actions" {
           "iam:TagRole",
           "iam:UntagRole",
         ]
-        Resource = "arn:aws:iam::*:role/owlbear-*"
+        Resource = [
+          "arn:aws:iam::*:role/owlbear-*",
+          "arn:aws:iam::*:instance-profile/owlbear-*",
+        ]
       },
       {
         Sid    = "LambdaManagement"
@@ -205,6 +208,7 @@ resource "aws_iam_role_policy" "github_actions" {
           "dynamodb:UpdateTable",
           "dynamodb:UpdateTimeToLive",
           "dynamodb:DescribeTimeToLive",
+          "dynamodb:DescribeContinuousBackups",
           "dynamodb:TagResource",
           "dynamodb:UntagResource",
           "dynamodb:ListTagsOfResource",
@@ -219,7 +223,6 @@ resource "aws_iam_role_policy" "github_actions" {
           "ssm:DeleteParameter",
           "ssm:GetParameter",
           "ssm:GetParameters",
-          "ssm:DescribeParameters",
           "ssm:AddTagsToResource",
           "ssm:ListTagsForResource",
           "ssm:RemoveTagsFromResource",
@@ -227,34 +230,25 @@ resource "aws_iam_role_policy" "github_actions" {
         Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/owlbear/*"
       },
       {
-        Sid    = "S3Dashboard"
+        Sid    = "SSMDescribe"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "S3Buckets"
         Effect = "Allow"
         Action = [
           "s3:CreateBucket",
           "s3:DeleteBucket",
-          "s3:PutBucketPolicy",
-          "s3:GetBucketPolicy",
-          "s3:DeleteBucketPolicy",
-          "s3:PutBucketWebsite",
-          "s3:GetBucketWebsite",
-          "s3:DeleteBucketWebsite",
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
           "s3:ListBucket",
-          "s3:PutBucketPublicAccessBlock",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:GetBucketAcl",
-          "s3:PutBucketAcl",
-          "s3:GetBucketCORS",
-          "s3:PutBucketCORS",
-          "s3:GetBucketVersioning",
-          "s3:PutBucketVersioning",
-          "s3:GetEncryptionConfiguration",
-          "s3:PutEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration",
-          "s3:GetBucketLocation",
+          "s3:Get*",
+          "s3:Put*",
+          "s3:DeleteObject",
+          "s3:DeleteBucketPolicy",
+          "s3:DeleteBucketWebsite",
         ]
         Resource = [
           "arn:aws:s3:::owlbear-*",
@@ -268,7 +262,6 @@ resource "aws_iam_role_policy" "github_actions" {
           "logs:CreateLogGroup",
           "logs:DeleteLogGroup",
           "logs:PutRetentionPolicy",
-          "logs:DescribeLogGroups",
           "logs:TagLogGroup",
           "logs:UntagLogGroup",
           "logs:ListTagsLogGroup",
@@ -277,6 +270,30 @@ resource "aws_iam_role_policy" "github_actions" {
           "logs:ListTagsForResource",
         ]
         Resource = "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/owlbear-*"
+      },
+      {
+        Sid    = "EventBridge"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:DeleteRule",
+          "events:DescribeRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:ListTargetsByRule",
+          "events:ListTagsForResource",
+          "events:TagResource",
+          "events:UntagResource",
+        ]
+        Resource = "arn:aws:events:${var.aws_region}:*:rule/owlbear-*"
+      },
+      {
+        Sid    = "CloudWatchLogsDescribe"
+        Effect = "Allow"
+        Action = [
+          "logs:DescribeLogGroups",
+        ]
+        Resource = "*"
       },
     ]
   })

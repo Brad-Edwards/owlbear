@@ -242,7 +242,21 @@ resource "aws_iam_role_policy" "eventbridge_ec2" {
         Effect   = "Allow"
         Action   = "ec2:StopInstances"
         Resource = aws_instance.dev.arn
-      }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:StartAutomationExecution",
+        ]
+        Resource = "arn:aws:ssm:${data.aws_region.current.id}:*:automation-definition/AWS-StopEC2Instance:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole",
+        ]
+        Resource = aws_iam_role.eventbridge_ec2[0].arn
+      },
     ]
   })
 }
@@ -250,13 +264,18 @@ resource "aws_iam_role_policy" "eventbridge_ec2" {
 resource "aws_cloudwatch_event_target" "stop_instance" {
   count = var.auto_shutdown_hour >= 0 ? 1 : 0
 
-  rule     = aws_cloudwatch_event_rule.auto_shutdown[0].name
-  arn      = "arn:aws:events:${data.aws_region.current.name}::ec2:StopInstances"
-  role_arn = aws_iam_role.eventbridge_ec2[0].arn
+  rule      = aws_cloudwatch_event_rule.auto_shutdown[0].name
+  target_id = "stop-graviton-dev"
+  arn       = "arn:aws:ssm:${data.aws_region.current.id}::automation-definition/AWS-StopEC2Instance"
+  role_arn  = aws_iam_role.eventbridge_ec2[0].arn
 
-  input = jsonencode({
-    InstanceIds = [aws_instance.dev.id]
-  })
+  input_transformer {
+    input_paths = {}
+    input_template = jsonencode({
+      InstanceId    = [aws_instance.dev.id]
+      AutomationAssumeRole = [aws_iam_role.eventbridge_ec2[0].arn]
+    })
+  }
 }
 
 data "aws_region" "current" {}

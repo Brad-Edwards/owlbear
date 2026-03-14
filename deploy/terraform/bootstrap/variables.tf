@@ -19,5 +19,5 @@ variable "lock_table_name" {
 variable "github_repo" {
   description = "GitHub repository (org/repo format)"
   type        = string
-  default     = "KeplerOps/owlbear"
+  default     = "Brad-Edwards/owlbear"
 }

@@ -19,5 +19,5 @@ variable "project_name" {
 variable "github_repo_url" {
   description = "Git repo URL to clone on instance startup"
   type        = string
-  default     = "https://github.com/KeplerOps/owlbear.git"
+  default     = "https://github.com/Brad-Edwards/owlbear.git"
 }

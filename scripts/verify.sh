@@ -548,18 +548,21 @@ phase_protected() {
     run_cheat_captured "${phase_dir}" "mem_reader" \
         "${cheats_dir}/mem_reader.bin"
 
-    # Assert: detection event with correct PID in dmesg
-    if grep -q "owlbear: process_vm_readv on PID ${GAME_PID}" \
+    # Assert: detection event with correct PID in dmesg.
+    # process_vm_readv internally calls __ptrace_may_access on the target,
+    # so the kprobe may log either "process_vm_readv" or "ptrace attempt".
+    # Under strace, the ptrace path fires first. Both are valid detections.
+    if grep -q "owlbear: process_vm_readv on PID ${GAME_PID}\|owlbear: ptrace attempt on protected PID ${GAME_PID}.*mem_reader" \
          "${phase_dir}/mem_reader/dmesg_diff.log" 2>/dev/null; then
         assert_pass "protected/mem_reader detected in dmesg (PID ${GAME_PID})"
     else
         assert_fail "protected/mem_reader detection missing" \
-            "expected: 'owlbear: process_vm_readv on PID ${GAME_PID}'"
+            "expected: 'owlbear: process_vm_readv on PID ${GAME_PID}' or 'ptrace attempt' from mem_reader"
     fi
 
-    # Extract cheat PID from dmesg for exact match
+    # Extract detection event
     local cheat_comm
-    cheat_comm=$(grep "owlbear: process_vm_readv" \
+    cheat_comm=$(grep "owlbear:.*PID ${GAME_PID}.*mem_reader\|owlbear: process_vm_readv on PID ${GAME_PID}" \
         "${phase_dir}/mem_reader/dmesg_diff.log" 2>/dev/null | head -1)
     if [ -n "${cheat_comm}" ]; then
         echo "${cheat_comm}" > "${phase_dir}/mem_reader/detection_event.txt"

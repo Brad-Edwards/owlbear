@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
 	printf("[ptrace_injector] Attached, target stopped. Reading state...\n");
 
 	/* Read game_state word-by-word via PEEKDATA */
-	struct game_state state;
+	struct game_state state = {0};
 	size_t nwords = (sizeof(state) + sizeof(long) - 1) / sizeof(long);
 	long *dst = (long *)&state;
 	uint64_t addr = state_addr;

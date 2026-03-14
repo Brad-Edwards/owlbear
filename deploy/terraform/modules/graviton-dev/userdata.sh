@@ -39,10 +39,11 @@ else
   cd ..
 fi
 
-# Build everything including tests and kernel module
+# Build everything: eBPF first (generates skeleton headers), then userspace, then kernel
 cd owlbear
+sudo -u ec2-user make -C ebpf || true
 sudo -u ec2-user make daemon game cheats || true
-sudo -u ec2-user make -C tests all || true
+sudo -u ec2-user make -C tests unit || true
 make -C kernel || true
 
 echo "=== Setup complete ==="

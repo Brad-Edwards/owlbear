@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `daemon/Makefile`: builds all new source files, links `-lbpf -lelf -lz`, adds `-I../ebpf` for skeleton headers
 - `cheats/Makefile`: builds 3 new cheat binaries (ptrace_writer, vm_writer, mprotect_injector)
 - `tests/Makefile`: builds 5 new test suites with daemon object dependencies
+- `.github/workflows/verify.yml`: E2E verification on Graviton3 via SSM — finds instance by tag, starts if stopped, syncs code, builds eBPF+kernel+userspace, runs unit tests + `verify.sh --upload`
+- `deploy/terraform/bootstrap/main.tf`: added `ssm:SendCommand`, `ssm:GetCommandInvocation`, `ssm:DescribeInstanceInformation`, `ec2:StartInstances` permissions for GitHub Actions role
+- `deploy/terraform/modules/graviton-dev/userdata.sh`: added `make -C ebpf` to instance bootstrap (generates skeleton headers needed by daemon)
 
 ## [0.9.0] - 2026-03-14
 

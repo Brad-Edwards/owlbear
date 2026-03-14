@@ -15,6 +15,11 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
 
+/* errno values — not in vmlinux.h, define manually for BPF */
+#ifndef EPERM
+#define EPERM 1
+#endif
+
 /* -------------------------------------------------------------------------
  * Event types — must match include/owlbear_events.h
  * Duplicated here because BPF programs can't include userspace headers.

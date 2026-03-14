@@ -234,6 +234,7 @@ resource "aws_iam_role_policy" "github_actions" {
         Effect = "Allow"
         Action = [
           "ssm:DescribeParameters",
+          "ssm:DescribeInstanceInformation",
         ]
         Resource = "*"
       },
@@ -294,6 +295,34 @@ resource "aws_iam_role_policy" "github_actions" {
           "logs:DescribeLogGroups",
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "SSMSendCommand"
+        Effect = "Allow"
+        Action = [
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation",
+          "ssm:ListCommandInvocations",
+        ]
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:*:instance/*",
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
+        ]
+      },
+      {
+        Sid    = "EC2StartStop"
+        Effect = "Allow"
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:DescribeInstanceStatus",
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
       },
     ]
   })

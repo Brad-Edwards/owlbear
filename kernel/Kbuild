@@ -1,0 +1,17 @@
+# Owlbear kernel module — Kbuild configuration
+#
+# Build with: make -C /lib/modules/$(uname -r)/build M=$(pwd)/kernel modules
+
+obj-m := owlbear.o
+
+owlbear-y := owlbear_main.o   \
+             owlbear_chardev.o \
+             owlbear_process.o \
+             owlbear_memory.o  \
+             owlbear_integrity.o \
+             owlbear_arm64.o
+
+ccflags-y := -I$(src)/../include \
+             -Wall \
+             -Werror \
+             -std=gnu11

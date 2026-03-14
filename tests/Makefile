@@ -1,0 +1,71 @@
+# Owlbear test suite
+
+CC       ?= gcc
+CFLAGS   := -std=c11 -Wall -Wextra -Werror \
+            -D_GNU_SOURCE \
+            -I$(CURDIR)/../include \
+            -I$(CURDIR)/../daemon \
+            $(CFLAGS_EXTRA)
+LDFLAGS  :=
+DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
+
+DAEMON_DIR := $(CURDIR)/../daemon
+
+# Test binaries — one per test file
+TEST_BINS := test_events test_policy test_scanner test_heartbeat test_info_parse
+
+.PHONY: all unit integration clean
+
+all: unit
+
+unit: $(TEST_BINS)
+	@failed=0; total=0; \
+	for t in $(TEST_BINS); do \
+		echo "--- Running $$t ---"; \
+		./$$t || failed=$$((failed + 1)); \
+		total=$$((total + 1)); \
+		echo ""; \
+	done; \
+	if [ $$failed -gt 0 ]; then \
+		echo "=== $$failed/$$total test suites FAILED ==="; \
+		exit 1; \
+	else \
+		echo "=== All $$total test suites passed ==="; \
+	fi
+
+test_events: test_harness.o test_events.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_policy: test_harness.o test_policy.o $(DAEMON_DIR)/policy.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_scanner: test_harness.o test_scanner.o $(DAEMON_DIR)/scanner.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_heartbeat: test_harness.o test_heartbeat.o $(DAEMON_DIR)/heartbeat.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_info_parse: test_harness.o test_info_parse.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Daemon objects needed by tests
+$(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
+
+integration:
+	@echo "Running integration tests..."
+	@for t in integration/test_*.sh; do \
+		echo "  $$t"; \
+		bash "$$t" || exit 1; \
+	done
+	@echo "All integration tests passed."
+
+clean:
+	$(RM) $(TEST_BINS) *.o *.d
+	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
+	$(RM) $(DAEMON_DIR)/*.d
+
+-include $(wildcard *.d)

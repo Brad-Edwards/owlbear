@@ -1,0 +1,17 @@
+title: Owlbear
+description: ARM64 kernel-mode anti-cheat for Linux
+baseurl: "/owlbear"
+url: "https://keplerops.github.io"
+theme: minima
+markdown: kramdown
+
+kramdown:
+  input: GFM
+
+header_pages:
+  - architecture/overview.md
+  - subsystems/process-monitoring.md
+  - subsystems/memory-protection.md
+  - subsystems/hardware-checks.md
+  - arm64/pac-mte-bti.md
+  - arm64/vs-x86.md

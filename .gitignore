@@ -1,41 +1,85 @@
-# Prerequisites
-*.d
+# --- Kernel module build artifacts ---
+*.ko
+*.mod.c
+*.mod.o
+*.order
+*.symvers
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
 
-# Compiled Object files
-*.slo
-*.lo
+# --- Object files ---
 *.o
 *.obj
+*.slo
+*.lo
 
-# Precompiled Headers
+# --- Precompiled headers ---
 *.gch
 *.pch
 
-# Linker files
+# --- Linker/debugger ---
 *.ilk
-
-# Debugger Files
 *.pdb
+*.dwo
 
-# Compiled Dynamic libraries
+# --- Libraries ---
 *.so
+!cheats/preload_hook.so
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
 *.lib
 
-# Executables
+# --- eBPF build artifacts ---
+ebpf/vmlinux.h
+*.bpf.o
+*.skel.h
+
+# --- Userspace binaries ---
+daemon/owlbeard
+game/owlbear-game
+cheats/*.bin
+tests/test_runner
+
+# --- Build system ---
+*.d
+*.mod
+*.smod
+.cache/
+compile_commands.json
+
+# --- Editor/IDE ---
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# --- Terraform ---
+deploy/terraform/**/.terraform/
+deploy/terraform/**/*.tfstate
+deploy/terraform/**/*.tfstate.backup
+deploy/terraform/**/.terraform.lock.hcl
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# --- Lambda packaging ---
+platform/api/*.zip
+
+# --- Runtime ---
+*.log
+*.pid
+core
+
+# --- Executables (generic) ---
 *.exe
 *.out
 *.app
-
-# debug information files
-*.dwo

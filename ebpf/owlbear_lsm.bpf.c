@@ -165,4 +165,50 @@ int BPF_PROG(owl_mmap_file, struct file *file, unsigned long reqprot,
 	return 0;
 }
 
+/* -------------------------------------------------------------------------
+ * LSM: file_mprotect
+ *
+ * Called when a process changes memory protection flags. Detects RW->RX
+ * transitions in the protected process, which is a common code injection
+ * technique: mmap(RW), write shellcode, mprotect(RX), execute.
+ *
+ * Observe-only: the JIT compiler legitimately does RW->RX transitions,
+ * so we emit an event but do not block.
+ * ----------------------------------------------------------------------- */
+
+SEC("lsm/file_mprotect")
+int BPF_PROG(owl_file_mprotect, struct vm_area_struct *vma,
+	     unsigned long reqprot, unsigned long prot)
+{
+	__u32 pid;
+
+	/*
+	 * Detect RW -> RX: the new protection includes EXEC (0x4) and the
+	 * VMA previously had write (0x2) permission.
+	 */
+	if (!(prot & 0x4))  /* PROT_EXEC not requested */
+		return 0;
+
+	pid = bpf_get_current_pid_tgid() >> 32;
+
+	if (!is_protected(pid))
+		return 0;
+
+	unsigned long old_flags = BPF_CORE_READ(vma, vm_flags);
+
+	/* VM_WRITE = 0x2 in vm_flags */
+	if (!(old_flags & 0x2))
+		return 0;
+
+	/*
+	 * RW->RX transition in protected process. Don't block —
+	 * JIT does this legitimately. Log for correlation.
+	 */
+	emit_event(OWL_EVENT_MPROTECT_EXEC, OWL_SEV_WARN,
+		   pid, pid,
+		   "BPF LSM: RW->RX mprotect");
+
+	return 0;
+}
+
 char LICENSE[] SEC("license") = "GPL";

@@ -1,0 +1,9 @@
+2026-03-14T22:07:28,019272+00:00 owlbear: initializing (target_pid=35246, enforce=0)
+2026-03-14T22:07:28,021317+00:00 owlbear: chardev registered at /dev/owlbear (major 243)
+2026-03-14T22:07:28,022190+00:00 owlbear: process monitoring active
+2026-03-14T22:07:28,022907+00:00 owlbear: memory protection active
+2026-03-14T22:07:28,023396+00:00 owlbear: integrity checks active (module load via kprobe)
+2026-03-14T22:07:28,024249+00:00 owlbear: ARM64 baseline: SCTLR=0xfc74f91d TCR=0x1001f5b5503510 MAIR=0x40044ffff VBAR=0xffff800008012800 MDSCR=0x1000
+2026-03-14T22:07:28,025819+00:00 owlbear: PAC supported, monitoring EnIA bit
+2026-03-14T22:07:28,026522+00:00 owlbear: ARM64 hardware checks active (interval=5000ms, PAC=yes)
+2026-03-14T22:07:28,027485+00:00 owlbear: initialized successfully

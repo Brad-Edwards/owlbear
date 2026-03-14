@@ -14,6 +14,9 @@ DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 CHEAT_SRCS := mem_reader.c \
               proc_mem_reader.c \
               ptrace_injector.c \
+              ptrace_writer.c \
+              vm_writer.c \
+              mprotect_injector.c \
               ld_preload_hook.c \
               debug_reg_setter.c
 

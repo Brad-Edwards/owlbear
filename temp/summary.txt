@@ -1,0 +1,34 @@
+# Owlbear E2E Verification Report
+# Generated: 2026-03-14T22:07:12Z
+# Host: ip-172-31-15-228.us-east-2.compute.internal
+# Kernel: 6.1.163-186.299.amzn2023.aarch64
+# Arch: aarch64
+# Instance: i-0777bb9453a4ccc4a
+# Account: 516608939870
+# Region: us-east-2
+# Script: /home/ec2-user/owlbear/scripts/verify.sh
+#
+# This file is machine-generated. Each line is a test assertion.
+# PASS/FAIL/SKIP status is determined by the script, not an LLM.
+#
+PASS: baseline/mem_reader exits successfully (code=124)
+PASS: baseline/mem_reader no detection events in dmesg
+PASS: baseline/proc_mem_reader exits successfully (code=124)
+PASS: baseline/proc_mem_reader no detection events in dmesg
+PASS: baseline/ptrace_injector exits successfully (code=0)
+PASS: baseline/ptrace_injector read valid game state
+PASS: baseline/ptrace_injector no detection events in dmesg
+PASS: protected/module initialized
+PASS: protected/target PID configured
+PASS: protected/no PAC false positives at load
+PASS: protected/mem_reader detected in dmesg (PID 35246)
+PASS: protected/mem_reader detection event captured
+PASS: protected/proc_mem_reader detected in dmesg (PID 35246)
+PASS: protected/proc_mem_reader detection event captured
+PASS: protected/ptrace_injector detected in dmesg (PID 35246)
+PASS: protected/ptrace_injector detection event captured
+PASS: protected/no PAC false positives during run
+
+# =========================================
+# Results: 17 passed, 0 failed, 0 skipped / 17 total
+# =========================================

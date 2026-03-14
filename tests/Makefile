@@ -12,7 +12,16 @@ DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 DAEMON_DIR := $(CURDIR)/../daemon
 
 # Test binaries — one per test file
-TEST_BINS := test_events test_policy test_scanner test_heartbeat test_info_parse
+TEST_BINS := test_events \
+             test_policy \
+             test_scanner \
+             test_heartbeat \
+             test_info_parse \
+             test_bpf_loader \
+             test_sig_loader \
+             test_event_pipeline \
+             test_integrity \
+             test_self_protect
 
 .PHONY: all unit integration clean
 
@@ -48,6 +57,21 @@ test_heartbeat: test_harness.o test_heartbeat.o $(DAEMON_DIR)/heartbeat.o
 test_info_parse: test_harness.o test_info_parse.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+test_bpf_loader: test_harness.o test_bpf_loader.o $(DAEMON_DIR)/bpf_event_convert.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_sig_loader: test_harness.o test_sig_loader.o $(DAEMON_DIR)/sig_loader.o $(DAEMON_DIR)/scanner.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_self_protect: test_harness.o test_self_protect.o $(DAEMON_DIR)/self_protect.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
@@ -66,6 +90,9 @@ integration:
 clean:
 	$(RM) $(TEST_BINS) *.o *.d
 	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
+	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
+	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o
+	$(RM) $(DAEMON_DIR)/self_protect.o
 	$(RM) $(DAEMON_DIR)/*.d
 
 -include $(wildcard *.d)

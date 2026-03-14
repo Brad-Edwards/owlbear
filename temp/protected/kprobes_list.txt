@@ -1,0 +1,6 @@
+ffff80000833ba64  k  __arm64_sys_process_vm_writev+0x0    
+ffff80000833ba28  k  __arm64_sys_process_vm_readv+0x0    
+ffff8000080adc20  k  __ptrace_may_access+0x0    
+ffff8000081612c0  k  do_init_module+0x0    
+ffff8000082f114c  k  vm_mmap_pgoff+0x0    
+ffff800008487960  k  mem_open+0x0    

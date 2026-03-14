@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-14
+
+### Added
+- **eBPF Loading and Enforcement (WP1):**
+  - `daemon/bpf_loader.c`: loads/attaches all three BPF skeletons (LSM, tracepoint, kprobe), populates `protected_pids`/`allowed_pids` maps, polls ring buffer via `ring_buffer__poll()`
+  - `daemon/bpf_event_convert.c`: pure BPF event → owlbear_event conversion (testable without libbpf)
+  - `ebpf/owlbear_lsm.bpf.c`: new `SEC("lsm/file_mprotect")` hook detects RW→RX transitions in protected process
+  - `OWL_EVENT_MPROTECT_EXEC` (0x0105) added to events header and BPF common header
+  - Graceful degradation: if any BPF program fails, others still operate; kmod-only fallback
+- **Event Pipeline (WP2):**
+  - `daemon/event_pipeline.c`: unified event processing — policy evaluation → enforcement action → logging. `[ENFORCE] [BLOCK]` log entries when `--enforce` is passed. SIGKILL on `OWL_ACT_KILL`. Periodic signature scan on game `.text` via `/proc/<pid>/maps` + `/proc/<pid>/mem`
+  - `daemon/sig_loader.c`: parses `signatures/default.sigs` line format (`NAME:PATTERN`), handles comments and malformed lines
+  - Default policy rules: BLOCK on ptrace/proc_mem/vm_readv/vm_writev in enforce mode; LOG on signature matches and module events
+- **New Cheat Vectors (WP3):**
+  - `cheats/ptrace_writer.c`: PTRACE_ATTACH + PTRACE_POKEDATA to write `health=9999`
+  - `cheats/vm_writer.c`: `process_vm_writev()` to write `health=9999`
+  - `cheats/mprotect_injector.c`: `mmap(RW)` → write ARM64/x86 shellcode → `mprotect(RX)` → execute
+- **Code Integrity (WP4):**
+  - `daemon/integrity.c`: CRC32 hash of game `.text` segment at baseline, periodic re-verification. Parses `/proc/<pid>/maps` for `r-xp` segments, emits `OWL_EVENT_CODE_INTEGRITY_FAIL` on mismatch
+- **Self-Protection (WP5):**
+  - `daemon/self_protect.c`: `prctl(PR_SET_DUMPABLE, 0)` blocks ptrace on daemon. Watchdog checks `/sys/module/owlbear/` existence, ioctl responsiveness, BPF ring buffer fd liveness every 5s
+  - `kernel/owlbear_integrity.c`: kprobe on `delete_module` emits `OWL_EVENT_MODULE_UNKNOWN` on any module unload
+- **Daemon epoll multiplexer:** replaced blocking `read()` loop with `epoll` on both `/dev/owlbear` fd and BPF ring buffer fd, periodic timer for integrity check (30s) and self-protection watchdog (5s)
+- **New tests:** 5 suites (test_bpf_loader, test_sig_loader, test_event_pipeline, test_integrity, test_self_protect) adding 38 tests. Total: 95 C tests across 10 suites
+- **verify.sh v2:** three phases (baseline, protected, self-protection), tests all 8 cheats, checks EPERM enforcement from eBPF LSM, integrity baseline capture, module unload detection, daemon survival
+
+### Changed
+- `daemon/main.c`: full rewrite — integrates BPF loader, event pipeline, integrity, self-protection, epoll event loop. Adds `--sigs` CLI flag
+- `daemon/Makefile`: builds all new source files, links `-lbpf -lelf -lz`, adds `-I../ebpf` for skeleton headers
+- `cheats/Makefile`: builds 3 new cheat binaries (ptrace_writer, vm_writer, mprotect_injector)
+- `tests/Makefile`: builds 5 new test suites with daemon object dependencies
+
 ## [0.9.0] - 2026-03-14
 
 ### Added

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-15
+
+### Added
+- **WP1d: LD_PRELOAD detection on process exec** (`daemon/preload_detect.c`): scans `/proc/<pid>/environ` for `LD_PRELOAD` on every `PROCESS_EXEC` event. Emits `OWL_EVENT_LIB_UNEXPECTED` (0x0203, severity CRITICAL) with the preload path in the module payload. Pure scanner function + I/O wrapper, stateless one-shot per exec.
+- `daemon/preload_detect.h`: public API (`owl_scan_environ_for_preload`, `owl_check_preload_env`)
+- `tests/test_preload_detect.c`: 5 unit tests (TDD) — synthetic buffer scan, not-found, null buffer, null output, self-check via /proc
+- `scripts/verify.sh`: E2E assertion for `ld_preload_hook` triggering `LIB_UNEXPECTED` in daemon log
+
+### Changed
+- `daemon/event_pipeline.c`: calls `pipeline_check_preload()` on `OWL_EVENT_PROCESS_EXEC` events, emits `LIB_UNEXPECTED` if `LD_PRELOAD` found
+- `daemon/Makefile`: added `preload_detect.c` to SRCS
+- `tests/Makefile`: added `test_preload_detect` suite, linked `preload_detect.o` into `test_event_pipeline`
+- `scripts/verify.sh`: version bumped to v2.1.0, added `ld_preload_hook.bin` to preflight checks
+- `README.md`: updated status (v2.1.0, 107 tests, 12 suites), added LD_PRELOAD detection
+
 ## [2.0.0] - 2026-03-15
 
 ### Added

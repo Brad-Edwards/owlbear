@@ -23,6 +23,7 @@ SRCS     := main.c \
             integrity.c \
             self_protect.c \
             debugger_detect.c \
+            preload_detect.c \
             policy.c \
             scanner.c \
             heartbeat.c

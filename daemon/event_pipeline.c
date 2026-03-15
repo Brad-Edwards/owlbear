@@ -16,6 +16,10 @@
 #include <unistd.h>
 
 #include "event_pipeline.h"
+#include "preload_detect.h"
+
+static void pipeline_check_preload(struct owl_pipeline *pipe,
+				   const struct owlbear_event *exec_ev);
 
 /* -------------------------------------------------------------------------
  * Initialization
@@ -86,7 +90,45 @@ enum owl_policy_action owl_pipeline_process(struct owl_pipeline *pipe,
 		break;
 	}
 
+	/* On exec events, check for LD_PRELOAD in the new process's environ */
+	if (ev->event_type == OWL_EVENT_PROCESS_EXEC)
+		pipeline_check_preload(pipe, ev);
+
 	return action;
+}
+
+/* -------------------------------------------------------------------------
+ * LD_PRELOAD detection on exec events
+ * ----------------------------------------------------------------------- */
+
+static void pipeline_check_preload(struct owl_pipeline *pipe,
+				   const struct owlbear_event *exec_ev)
+{
+	char preload_val[256];
+
+	if (exec_ev->pid <= 0)
+		return;
+
+	if (owl_check_preload_env((pid_t)exec_ev->pid,
+				  preload_val, sizeof(preload_val)) != 1)
+		return;
+
+	struct owlbear_event ev;
+	struct timespec ts;
+
+	memset(&ev, 0, sizeof(ev));
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	ev.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
+			  (uint64_t)ts.tv_nsec;
+	ev.event_type = OWL_EVENT_LIB_UNEXPECTED;
+	ev.severity = OWL_SEV_CRITICAL;
+	ev.source = OWL_SRC_DAEMON;
+	ev.pid = exec_ev->pid;
+	ev.target_pid = (uint32_t)pipe->target_pid;
+	strncpy(ev.payload.module.name, preload_val,
+		sizeof(ev.payload.module.name) - 1);
+
+	owl_pipeline_process(pipe, &ev);
 }
 
 /* -------------------------------------------------------------------------

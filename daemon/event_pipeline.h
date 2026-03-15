@@ -17,6 +17,7 @@
 
 #include "owlbear_events.h"
 #include "policy.h"
+#include "process_tree.h"
 #include "scanner.h"
 
 /* Maximum size of game .text to scan (8 MB) */
@@ -26,6 +27,7 @@
 struct owl_pipeline {
 	struct owl_policy *policy;
 	struct owl_sig_db *sig_db;
+	struct owl_ptree  *ptree;
 	pid_t              target_pid;
 	bool               enforce;
 	FILE              *log_file;
@@ -42,6 +44,7 @@ struct owl_pipeline {
  * @pipe:    Pipeline context
  * @policy:  Policy engine (ownership retained by caller)
  * @sig_db:  Signature database (ownership retained by caller)
+ * @ptree:   Process tree (may be NULL; ownership retained by caller)
  * @target:  PID of the protected process
  * @enforce: Whether to take enforcement actions
  * @logf:    Log file (may be NULL for stdout only)
@@ -49,6 +52,7 @@ struct owl_pipeline {
 void owl_pipeline_init(struct owl_pipeline *pipe,
 		       struct owl_policy *policy,
 		       struct owl_sig_db *sig_db,
+		       struct owl_ptree *ptree,
 		       pid_t target, bool enforce, FILE *logf);
 
 /**

@@ -19,6 +19,7 @@ DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 SRCS     := main.c \
             bpf_loader.c \
             event_pipeline.c \
+            process_tree.c \
             sig_loader.c \
             integrity.c \
             self_protect.c \

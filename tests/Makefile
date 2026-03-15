@@ -23,7 +23,8 @@ TEST_BINS := test_events \
              test_integrity \
              test_self_protect \
              test_debugger_detect \
-             test_preload_detect
+             test_preload_detect \
+             test_process_tree
 
 .PHONY: all unit integration clean
 
@@ -65,7 +66,7 @@ test_bpf_loader: test_harness.o test_bpf_loader.o $(DAEMON_DIR)/bpf_event_conver
 test_sig_loader: test_harness.o test_sig_loader.o $(DAEMON_DIR)/sig_loader.o $(DAEMON_DIR)/scanner.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/preload_detect.o
+test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o
@@ -78,6 +79,9 @@ test_debugger_detect: test_harness.o test_debugger_detect.o $(DAEMON_DIR)/debugg
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_preload_detect: test_harness.o test_preload_detect.o $(DAEMON_DIR)/preload_detect.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_process_tree: test_harness.o test_process_tree.o $(DAEMON_DIR)/process_tree.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Daemon objects needed by tests
@@ -100,7 +104,7 @@ clean:
 	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
 	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
 	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o
-	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o
+	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
 	$(RM) $(DAEMON_DIR)/*.d
 
 -include $(wildcard *.d)

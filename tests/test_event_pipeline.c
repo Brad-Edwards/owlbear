@@ -44,7 +44,7 @@ TEST(pipeline_observe_mode_downgrades_block) {
 			    OWL_SEV_INFO, OWL_ACT_BLOCK);
 
 	/* Observe mode (enforce=false) */
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	struct owlbear_event ev = make_event(OWL_EVENT_PTRACE_ATTEMPT,
 					     OWL_SEV_CRITICAL, 50, 100);
@@ -65,7 +65,7 @@ TEST(pipeline_enforce_mode_keeps_block) {
 			    OWL_SEV_INFO, OWL_ACT_BLOCK);
 
 	/* Enforce mode */
-	owl_pipeline_init(&pipe, &policy, &db, 100, true, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, true, NULL);
 
 	struct owlbear_event ev = make_event(OWL_EVENT_PTRACE_ATTEMPT,
 					     OWL_SEV_CRITICAL, 50, 100);
@@ -83,7 +83,7 @@ TEST(pipeline_observe_returns_observe_for_unmatched) {
 	owl_policy_init(&policy);
 	owl_sig_db_init(&db);
 
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	struct owlbear_event ev = make_event(OWL_EVENT_PROCESS_CREATE,
 					     OWL_SEV_INFO, 50, 100);
@@ -99,7 +99,7 @@ TEST(pipeline_counts_events) {
 
 	owl_policy_init(&policy);
 	owl_sig_db_init(&db);
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	struct owlbear_event ev = make_event(OWL_EVENT_PROCESS_CREATE,
 					     OWL_SEV_INFO, 50, 100);
@@ -118,7 +118,7 @@ TEST(pipeline_null_event_returns_observe) {
 
 	owl_policy_init(&policy);
 	owl_sig_db_init(&db);
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	ASSERT_EQ(owl_pipeline_process(&pipe, NULL), OWL_ACT_OBSERVE);
 }
@@ -144,7 +144,7 @@ TEST(pipeline_scan_buffer_finds_match) {
 	owl_policy_add_rule(&policy, OWL_EVENT_SIGNATURE_MATCH,
 			    OWL_SEV_INFO, OWL_ACT_LOG);
 
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	uint8_t buf[] = {0x00, 0x41, 0x42, 0x43, 0x44, 0x00};
 	int found = owl_pipeline_scan_buffer(&pipe, buf, sizeof(buf), 0x1000);
@@ -164,7 +164,7 @@ TEST(pipeline_scan_buffer_no_match) {
 	owl_sig_parse_pattern(&rule, "test", "FF FF FF FF");
 	owl_sig_db_add(&db, &rule);
 
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	uint8_t buf[] = {0x00, 0x01, 0x02, 0x03};
 	int found = owl_pipeline_scan_buffer(&pipe, buf, sizeof(buf), 0x1000);
@@ -180,7 +180,7 @@ TEST(pipeline_scan_empty_db_returns_zero) {
 
 	owl_policy_init(&policy);
 	owl_sig_db_init(&db);
-	owl_pipeline_init(&pipe, &policy, &db, 100, false, NULL);
+	owl_pipeline_init(&pipe, &policy, &db, NULL, 100, false, NULL);
 
 	uint8_t buf[] = {0x41, 0x42};
 	int found = owl_pipeline_scan_buffer(&pipe, buf, sizeof(buf), 0);

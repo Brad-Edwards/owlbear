@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-15
+
+### Added
+- **WP1e: Process tree construction from tracepoint events** (`daemon/process_tree.c`): open-addressing hash map (linear probing, 1024 slots) storing PID -> {parent_pid, comm, birth_time}. Fed by fork/exec/exit events via `owl_ptree_on_event()` in the pipeline. Provides `owl_ptree_is_descendant()` and `owl_ptree_get_chain()` for correlation engine ancestry queries.
+- `daemon/process_tree.h`: public API (init, destroy, insert, remove, lookup, is_descendant, get_chain, on_event)
+- `tests/test_process_tree.c`: 8 unit tests (TDD) — insert/lookup, parent chain, ancestry chain, descendant check, remove, capacity, null inputs, reinsert after exit
+
+### Changed
+- `daemon/event_pipeline.h`: added `struct owl_ptree *ptree` field to pipeline context, added ptree parameter to `owl_pipeline_init()`
+- `daemon/event_pipeline.c`: calls `owl_ptree_on_event()` after LD_PRELOAD check for process lifecycle events
+- `daemon/main.c`: instantiates `struct owl_ptree`, passes to pipeline init, destroys on cleanup
+- `daemon/Makefile`: added `process_tree.c` to SRCS
+- `tests/Makefile`: added `test_process_tree` suite, linked `process_tree.o` into `test_event_pipeline`
+- `tests/test_event_pipeline.c`: updated `owl_pipeline_init()` calls with NULL ptree parameter
+
 ## [2.1.0] - 2026-03-15
 
 ### Added

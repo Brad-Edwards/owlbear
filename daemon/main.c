@@ -28,6 +28,7 @@
 #include "bpf_loader.h"
 #include "event_pipeline.h"
 #include "integrity.h"
+#include "process_tree.h"
 #include "policy.h"
 #include "scanner.h"
 #include "self_protect.h"
@@ -678,6 +679,7 @@ int main(int argc, char *argv[])
 
 	struct owl_policy policy;
 	struct owl_sig_db sig_db;
+	struct owl_ptree ptree;
 	struct owl_pipeline pipeline;
 	struct owl_integrity integrity;
 	struct owl_self_protect selfprot;
@@ -717,8 +719,11 @@ int main(int argc, char *argv[])
 		/* Non-fatal: scanner will just not match anything */
 	}
 
+	/* Initialize process tree */
+	owl_ptree_init(&ptree);
+
 	/* Initialize event pipeline */
-	owl_pipeline_init(&pipeline, &policy, &sig_db,
+	owl_pipeline_init(&pipeline, &policy, &sig_db, &ptree,
 			  cfg.target_pid, cfg.enforce, log_file);
 
 	/* Open the kernel device */
@@ -786,6 +791,7 @@ int main(int argc, char *argv[])
 	       pipeline.actions_kill, pipeline.sig_matches);
 
 cleanup:
+	owl_ptree_destroy(&ptree);
 	if (bpf)
 		owl_bpf_destroy(bpf);
 	if (dev_fd >= 0)

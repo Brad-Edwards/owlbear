@@ -17,6 +17,7 @@
 
 #include "event_pipeline.h"
 #include "preload_detect.h"
+#include "process_tree.h"
 
 static void pipeline_check_preload(struct owl_pipeline *pipe,
 				   const struct owlbear_event *exec_ev);
@@ -28,11 +29,13 @@ static void pipeline_check_preload(struct owl_pipeline *pipe,
 void owl_pipeline_init(struct owl_pipeline *pipe,
 		       struct owl_policy *policy,
 		       struct owl_sig_db *sig_db,
+		       struct owl_ptree *ptree,
 		       pid_t target, bool enforce, FILE *logf)
 {
 	memset(pipe, 0, sizeof(*pipe));
 	pipe->policy = policy;
 	pipe->sig_db = sig_db;
+	pipe->ptree = ptree;
 	pipe->target_pid = target;
 	pipe->enforce = enforce;
 	pipe->log_file = logf;
@@ -93,6 +96,10 @@ enum owl_policy_action owl_pipeline_process(struct owl_pipeline *pipe,
 	/* On exec events, check for LD_PRELOAD in the new process's environ */
 	if (ev->event_type == OWL_EVENT_PROCESS_EXEC)
 		pipeline_check_preload(pipe, ev);
+
+	/* Feed process lifecycle events into the process tree */
+	if (pipe->ptree)
+		owl_ptree_on_event(pipe->ptree, ev);
 
 	return action;
 }

@@ -28,7 +28,8 @@ SRCS     := main.c \
             preload_detect.c \
             policy.c \
             scanner.c \
-            heartbeat.c
+            heartbeat.c \
+            net_allowlist.c
 OBJS     := $(SRCS:.c=.o)
 DEPS     := $(SRCS:.c=.d)
 
@@ -44,7 +45,7 @@ $(TARGET): $(OBJS)
 
 # bpf_loader.c includes generated skeleton headers with overlength string literals.
 bpf_loader.o: CFLAGS += -Wno-overlength-strings
-bpf_loader.o: bpf_loader.c ../ebpf/owlbear_lsm.skel.h ../ebpf/owlbear_trace.skel.h ../ebpf/owlbear_kprobe.skel.h
+bpf_loader.o: bpf_loader.c ../ebpf/owlbear_lsm.skel.h ../ebpf/owlbear_trace.skel.h ../ebpf/owlbear_kprobe.skel.h ../ebpf/owlbear_net.skel.h
 
 clean:
 	$(RM) $(TARGET) $(OBJS) $(DEPS)

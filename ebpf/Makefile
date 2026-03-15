@@ -13,7 +13,8 @@ BPF_CFLAGS := -g -O2 -target bpf \
 # eBPF program sources
 BPF_SRCS := owlbear_lsm.bpf.c \
             owlbear_trace.bpf.c \
-            owlbear_kprobe.bpf.c
+            owlbear_kprobe.bpf.c \
+            owlbear_net.bpf.c
 
 BPF_OBJS := $(BPF_SRCS:.c=.o)
 BPF_SKELS := $(BPF_SRCS:.bpf.c=.skel.h)

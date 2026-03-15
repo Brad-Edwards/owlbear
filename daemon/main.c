@@ -11,6 +11,7 @@
  *   owlbeard --help
  */
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -28,6 +29,7 @@
 #include "bpf_loader.h"
 #include "event_pipeline.h"
 #include "integrity.h"
+#include "net_allowlist.h"
 #include "process_tree.h"
 #include "policy.h"
 #include "scanner.h"
@@ -116,6 +118,8 @@ static const char *event_type_str(uint32_t type)
 	case OWL_EVENT_HEARTBEAT_MISSED:     return "HEARTBEAT_MISSED";
 	case OWL_EVENT_EBPF_DETACHED:        return "EBPF_DETACHED";
 	case OWL_EVENT_KMOD_UNLOADED:        return "KMOD_UNLOADED";
+	case OWL_EVENT_NET_CONNECT:          return "NET_CONNECT";
+	case OWL_EVENT_NET_SEND:             return "NET_SEND";
 	default:                             return "UNKNOWN";
 	}
 }
@@ -215,6 +219,19 @@ static void print_event(const struct owlbear_event *ev, FILE *out)
 			(unsigned long long)ev->payload.signature.match_offset,
 			(unsigned long long)ev->payload.signature.region_base);
 		break;
+
+	case OWL_EVENT_NET_CONNECT:
+	case OWL_EVENT_NET_SEND: {
+		uint32_t a = ev->payload.network.dst_addr;
+		fprintf(out, " dst=%u.%u.%u.%u:%u proto=%u bytes=%llu proc=%s",
+			a & 0xFF, (a >> 8) & 0xFF,
+			(a >> 16) & 0xFF, (a >> 24) & 0xFF,
+			ntohs(ev->payload.network.dst_port),
+			ev->payload.network.protocol,
+			(unsigned long long)ev->payload.network.bytes,
+			ev->payload.network.comm);
+		break;
+	}
 
 	default:
 		break;
@@ -662,6 +679,12 @@ static void setup_default_policy(struct owl_policy *policy, bool enforce)
 	owl_policy_add_rule(policy, OWL_EVENT_MODULE_UNKNOWN,
 			    OWL_SEV_INFO, OWL_ACT_LOG);
 
+	/* Log network events */
+	owl_policy_add_rule(policy, OWL_EVENT_NET_CONNECT,
+			    OWL_SEV_INFO, OWL_ACT_LOG);
+	owl_policy_add_rule(policy, OWL_EVENT_NET_SEND,
+			    OWL_SEV_INFO, OWL_ACT_LOG);
+
 	/* Log ARM64 hardware anomalies */
 	owl_policy_add_rule(policy, 0, OWL_SEV_WARN, OWL_ACT_LOG);
 }
@@ -680,6 +703,7 @@ int main(int argc, char *argv[])
 	struct owl_policy policy;
 	struct owl_sig_db sig_db;
 	struct owl_ptree ptree;
+	struct owl_net_allowlist net_al;
 	struct owl_pipeline pipeline;
 	struct owl_integrity integrity;
 	struct owl_self_protect selfprot;
@@ -722,8 +746,13 @@ int main(int argc, char *argv[])
 	/* Initialize process tree */
 	owl_ptree_init(&ptree);
 
+	/* Initialize network allowlist */
+	owl_net_allowlist_init(&net_al);
+	/* Default server IPs — add known game servers here */
+	owl_net_allowlist_add(&net_al, inet_addr("127.0.0.1"));
+
 	/* Initialize event pipeline */
-	owl_pipeline_init(&pipeline, &policy, &sig_db, &ptree,
+	owl_pipeline_init(&pipeline, &policy, &sig_db, &ptree, &net_al,
 			  cfg.target_pid, cfg.enforce, log_file);
 
 	/* Open the kernel device */
@@ -760,10 +789,11 @@ int main(int argc, char *argv[])
 		if (owl_bpf_allow_pid(bpf, (uint32_t)cfg.target_pid) < 0)
 			fprintf(stderr, "owlbeard: failed to whitelist game in BPF map\n");
 
-		printf("owlbeard: BPF: lsm=%s trace=%s kprobe=%s\n",
+		printf("owlbeard: BPF: lsm=%s trace=%s kprobe=%s net=%s\n",
 		       owl_bpf_has_lsm(bpf) ? "yes" : "no",
 		       owl_bpf_has_trace(bpf) ? "yes" : "no",
-		       owl_bpf_has_kprobe(bpf) ? "yes" : "no");
+		       owl_bpf_has_kprobe(bpf) ? "yes" : "no",
+		       owl_bpf_has_net(bpf) ? "yes" : "no");
 	}
 
 	/* Initialize code integrity baseline */

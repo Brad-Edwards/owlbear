@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-03-15
+
+### Added
+- WP3: Network monitoring via eBPF kprobes (`ebpf/owlbear_net.bpf.c`)
+- kprobes on `tcp_v4_connect`, `udp_sendmsg`; filter by protected PID; observe-only
+- `OWL_EVENT_NET_CONNECT` (0x0600), `OWL_EVENT_NET_SEND` (0x0601) event types
+- `struct owl_payload_network`: dst_addr, dst_port, protocol, bytes, comm
+- `daemon/net_allowlist.{h,c}`: static IP allowlist, logs if destination not in list
+- `cheats/net_exfil.c`: UDP game state exfiltration cheat
+- `tests/test_net_allowlist.c`: 8 unit tests
+- 2 BPF conversion tests for network events in `test_bpf_loader.c`
+
+### Changed
+- `include/owlbear_events.h`: network event types + payload + union member
+- `daemon/bpf_loader.c`: loads owlbear_net skeleton
+- `daemon/bpf_event_convert.c`: NET_CONNECT/NET_SEND conversion
+- `daemon/event_pipeline.{h,c}`: allowlist integration, updated init signature
+- `daemon/main.c`: network event formatting, policy rules, allowlist init
+
 ## [2.3.1] - 2026-03-15
 
 ### Fixed

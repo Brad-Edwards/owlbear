@@ -90,6 +90,11 @@ bool owl_bpf_has_trace(const struct owl_bpf_ctx *ctx);
 bool owl_bpf_has_kprobe(const struct owl_bpf_ctx *ctx);
 
 /**
+ * owl_bpf_has_net - Check if network kprobe programs loaded successfully
+ */
+bool owl_bpf_has_net(const struct owl_bpf_ctx *ctx);
+
+/**
  * owl_bpf_event_convert - Convert a BPF ring buffer event to owlbear_event
  * @bpf_data:  Raw BPF event data (struct owl_bpf_event layout)
  * @bpf_size:  Size of BPF event data

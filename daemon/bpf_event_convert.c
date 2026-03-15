@@ -66,6 +66,19 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 		       : sizeof(bev->detail));
 		break;
 
+	case OWL_EVENT_NET_CONNECT:
+	case OWL_EVENT_NET_SEND:
+		/* detail[0..15]: dst_addr(4) + dst_port(2) + proto(2) + bytes(8) */
+		memcpy(&out->payload.network.dst_addr, bev->detail + 0, 4);
+		memcpy(&out->payload.network.dst_port, bev->detail + 4, 2);
+		memcpy(&out->payload.network.protocol, bev->detail + 6, 2);
+		memcpy(&out->payload.network.bytes,    bev->detail + 8, 8);
+		memcpy(out->payload.network.comm, bev->comm,
+		       sizeof(out->payload.network.comm) < sizeof(bev->comm)
+		       ? sizeof(out->payload.network.comm)
+		       : sizeof(bev->comm));
+		break;
+
 	default:
 		memcpy(out->payload.raw, bev->detail,
 		       sizeof(out->payload.raw) < sizeof(bev->detail)

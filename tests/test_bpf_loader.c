@@ -162,6 +162,76 @@ TEST(bpf_convert_unknown_type_uses_raw) {
 }
 
 /* -------------------------------------------------------------------------
+ * Network event conversion tests
+ * ----------------------------------------------------------------------- */
+
+TEST(bpf_convert_net_connect_event) {
+	struct test_bpf_event bev;
+	struct owlbear_event out;
+
+	memset(&bev, 0, sizeof(bev));
+	bev.timestamp_ns = 9999ULL;
+	bev.event_type = OWL_EVENT_NET_CONNECT;
+	bev.severity = OWL_SEV_WARN;
+	bev.pid = 700;
+	bev.target_pid = 700;
+	strncpy(bev.comm, "game_proc", sizeof(bev.comm));
+
+	/* Pack detail: dst_addr(4) + dst_port(2) + proto(2) + bytes(8) */
+	uint32_t dst_addr = 0xC0A80101;  /* 192.168.1.1 in network order */
+	uint16_t dst_port = 0x5000;      /* port in network order */
+	uint16_t proto = 6;              /* TCP */
+	uint64_t bytes_val = 0;          /* connect: 0 bytes */
+
+	memcpy(bev.detail + 0, &dst_addr, 4);
+	memcpy(bev.detail + 4, &dst_port, 2);
+	memcpy(bev.detail + 6, &proto, 2);
+	memcpy(bev.detail + 8, &bytes_val, 8);
+
+	int ret = owl_bpf_event_convert(&bev, sizeof(bev), &out);
+	ASSERT_EQ(ret, 0);
+	ASSERT_EQ(out.event_type, OWL_EVENT_NET_CONNECT);
+	ASSERT_EQ(out.severity, OWL_SEV_WARN);
+	ASSERT_EQ(out.source, OWL_SRC_EBPF);
+	ASSERT_EQ(out.pid, 700);
+	ASSERT_EQ(out.payload.network.dst_addr, dst_addr);
+	ASSERT_EQ(out.payload.network.dst_port, dst_port);
+	ASSERT_EQ(out.payload.network.protocol, 6);
+	ASSERT_EQ(out.payload.network.bytes, 0);
+}
+
+TEST(bpf_convert_net_send_event) {
+	struct test_bpf_event bev;
+	struct owlbear_event out;
+
+	memset(&bev, 0, sizeof(bev));
+	bev.timestamp_ns = 8888ULL;
+	bev.event_type = OWL_EVENT_NET_SEND;
+	bev.severity = OWL_SEV_WARN;
+	bev.pid = 800;
+	bev.target_pid = 800;
+	strncpy(bev.comm, "cheat_udp", sizeof(bev.comm));
+
+	uint32_t dst_addr = 0x636363C0;  /* 192.99.99.99 */
+	uint16_t dst_port = 0x697A;      /* 31337 in network order */
+	uint16_t proto = 17;             /* UDP */
+	uint64_t bytes_val = 256;
+
+	memcpy(bev.detail + 0, &dst_addr, 4);
+	memcpy(bev.detail + 4, &dst_port, 2);
+	memcpy(bev.detail + 6, &proto, 2);
+	memcpy(bev.detail + 8, &bytes_val, 8);
+
+	int ret = owl_bpf_event_convert(&bev, sizeof(bev), &out);
+	ASSERT_EQ(ret, 0);
+	ASSERT_EQ(out.event_type, OWL_EVENT_NET_SEND);
+	ASSERT_EQ(out.payload.network.dst_addr, dst_addr);
+	ASSERT_EQ(out.payload.network.dst_port, dst_port);
+	ASSERT_EQ(out.payload.network.protocol, 17);
+	ASSERT_EQ(out.payload.network.bytes, 256);
+}
+
+/* -------------------------------------------------------------------------
  * Runner
  * ----------------------------------------------------------------------- */
 
@@ -178,6 +248,8 @@ int main(void)
 	RUN_TEST(bpf_convert_null_output_fails);
 	RUN_TEST(bpf_convert_too_small_fails);
 	RUN_TEST(bpf_convert_unknown_type_uses_raw);
+	RUN_TEST(bpf_convert_net_connect_event);
+	RUN_TEST(bpf_convert_net_send_event);
 
 	TEST_SUMMARY();
 	return test_failures;

@@ -30,12 +30,14 @@ void owl_pipeline_init(struct owl_pipeline *pipe,
 		       struct owl_policy *policy,
 		       struct owl_sig_db *sig_db,
 		       struct owl_ptree *ptree,
+		       struct owl_net_allowlist *al,
 		       pid_t target, bool enforce, FILE *logf)
 {
 	memset(pipe, 0, sizeof(*pipe));
 	pipe->policy = policy;
 	pipe->sig_db = sig_db;
 	pipe->ptree = ptree;
+	pipe->net_allowlist = al;
 	pipe->target_pid = target;
 	pipe->enforce = enforce;
 	pipe->log_file = logf;
@@ -100,6 +102,19 @@ enum owl_policy_action owl_pipeline_process(struct owl_pipeline *pipe,
 	/* Feed process lifecycle events into the process tree */
 	if (pipe->ptree)
 		owl_ptree_on_event(pipe->ptree, ev);
+
+	/* Check network events against IP allowlist */
+	if (pipe->net_allowlist &&
+	    (ev->event_type == OWL_EVENT_NET_CONNECT ||
+	     ev->event_type == OWL_EVENT_NET_SEND)) {
+		if (!owl_net_allowlist_check(pipe->net_allowlist,
+					    ev->payload.network.dst_addr)) {
+			fprintf(out, "[NET_WARN] destination not in allowlist: "
+				"event=0x%04x pid=%u\n",
+				ev->event_type, ev->pid);
+			fflush(out);
+		}
+	}
 
 	return action;
 }

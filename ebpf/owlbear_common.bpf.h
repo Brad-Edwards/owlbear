@@ -35,6 +35,9 @@
 #define OWL_EVENT_DEV_MEM_ACCESS     0x0106
 #define OWL_EVENT_MODULE_LOAD        0x0200
 
+#define OWL_EVENT_NET_CONNECT        0x0600
+#define OWL_EVENT_NET_SEND           0x0601
+
 #define OWL_SEV_INFO     0
 #define OWL_SEV_WARN     1
 #define OWL_SEV_CRITICAL 2

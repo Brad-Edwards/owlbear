@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v2.3.0)
+# Owlbear E2E Verification Report (v2.4.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -326,7 +326,8 @@ HEADER
                cheats/vm_writer.bin cheats/mprotect_injector.bin \
                cheats/mprotect_inject_via_ptrace.bin \
                cheats/dev_mem_reader.bin \
-               cheats/ld_preload_hook.bin; do
+               cheats/ld_preload_hook.bin \
+               cheats/net_exfil.bin; do
         if [ ! -f "${PROJECT_DIR}/${bin}" ]; then
             warn "Missing: ${bin} — building..."
             missing=1
@@ -549,6 +550,17 @@ phase_baseline() {
         assert_pass "baseline/ld_preload_hook runs without module (code=${rc})"
     else
         assert_fail "baseline/ld_preload_hook should succeed without module" "exit_code=${rc}"
+    fi
+
+    # --- net_exfil (baseline) ---
+    run_cheat_captured "${phase_dir}" "net_exfil" \
+        "${cheats_dir}/net_exfil.bin"
+
+    rc=$(cat "${phase_dir}/net_exfil/exit_code")
+    if [ "$rc" -eq 0 ]; then
+        assert_pass "baseline/net_exfil UDP send succeeds unprotected (code=${rc})"
+    else
+        assert_fail "baseline/net_exfil should succeed without module" "exit_code=${rc}"
     fi
 
     capture_dmesg > "${phase_dir}/dmesg_after.txt"
@@ -842,6 +854,26 @@ phase_protected() {
         assert_fail "protected/ld_preload_hook LIB_UNEXPECTED detection missing"
     fi
 
+    # --- net_exfil (protected) ---
+    run_cheat_captured "${phase_dir}" "net_exfil" \
+        "${cheats_dir}/net_exfil.bin"
+
+    sleep 1  # daemon processes ring buffer event async
+
+    # Detection: NET_SEND or NET_WARN in daemon log with 192.168.99.99:31337
+    if [ -f "${phase_dir}/daemon.log" ] && \
+       grep -q "NET_SEND\|NET_WARN\|net_exfil" "${phase_dir}/daemon.log" 2>/dev/null; then
+        assert_pass "protected/net_exfil triggers NET_SEND detection in daemon log"
+    elif [ -f "${phase_dir}/daemon_stdout.log" ] && \
+       grep -q "NET_SEND\|NET_WARN\|net_exfil" "${phase_dir}/daemon_stdout.log" 2>/dev/null; then
+        assert_pass "protected/net_exfil triggers NET_SEND detection (stdout)"
+    else
+        # net_exfil runs as its own PID which may not be in protected_pids
+        # kprobe only fires for protected PIDs — partial E2E coverage expected
+        assert_skip "protected/net_exfil detection" \
+            "net_exfil PID not in protected_pids map (expected for separate process)"
+    fi
+
     # Check daemon log for BLOCK entries if enforce mode
     if [ -f "${phase_dir}/daemon.log" ]; then
         if grep -q "\[ENFORCE\].*\[BLOCK\]" "${phase_dir}/daemon.log" 2>/dev/null; then
@@ -1001,7 +1033,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v2.3.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v2.4.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

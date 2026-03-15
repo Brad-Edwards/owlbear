@@ -19,21 +19,24 @@ apt-get install -y -qq \
   make \
   git \
   linux-headers-$(uname -r) \
+  linux-tools-$(uname -r) \
   libelf-dev \
   libcurl4-openssl-dev \
   libncurses-dev \
   libbpf-dev \
-  bpftool \
   strace \
   jq \
   tmux \
   htop \
   zlib1g-dev \
-  awscli
+  unzip
 
-# SSM agent (Ubuntu AMI may not have it)
-if ! systemctl is-active --quiet amazon-ssm-agent 2>/dev/null; then
-  snap install amazon-ssm-agent --classic 2>/dev/null || true
+# AWS CLI v2
+if ! command -v aws &>/dev/null; then
+  curl -sf "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
+  rm -rf /tmp/awscliv2.zip /tmp/aws
 fi
 
 # Clone or update repo

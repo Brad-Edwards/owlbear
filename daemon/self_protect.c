@@ -67,6 +67,9 @@ int owl_selfprotect_watchdog(struct owl_self_protect *sp)
 	bool mod_present = owl_selfprotect_check_module();
 	if (!mod_present && sp->module_present) {
 		fprintf(stderr, "owlbeard: [ALERT] kernel module unloaded!\n");
+		fflush(stderr);
+		printf("owlbeard: [ALERT] kernel module unloaded!\n");
+		fflush(stdout);
 		result |= 0x01;
 	}
 	sp->module_present = mod_present;

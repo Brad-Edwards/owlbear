@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-15
+
+### Added
+- **WP1a: In-process mprotect injection cheat** (`cheats/mprotect_inject_via_ptrace.c`): realistic code injection attack chain — PTRACE_ATTACH to game, inject mmap+mprotect syscalls into game's execution context via register manipulation and single-stepping. The mprotect(RW->RX) call originates from the game's PID, correctly firing the eBPF LSM `file_mprotect` hook. Supports ARM64 (SVC #0) and x86_64 (syscall). Replaces the skipped E2E assertion with 2 real detection checks.
+
+### Changed
+- `scripts/verify.sh`: added `mprotect_inject_via_ptrace` to baseline (assert injection succeeds) and protected (assert PTRACE_ATTEMPT or MPROTECT_EXEC detection) phases. Replaced `assert_skip` for mprotect detection with real assertions. Version bumped to v1.1.0.
+- `cheats/Makefile`: builds `mprotect_inject_via_ptrace.bin`
+
 ## [1.0.0] - 2026-03-14
 
 ### Added

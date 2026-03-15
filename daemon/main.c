@@ -337,9 +337,9 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		return -1;
 	}
 
-	/* Add kernel chardev fd */
+	/* Add kernel chardev fd — include HUP/ERR for module unload detection */
 	memset(&ev, 0, sizeof(ev));
-	ev.events = EPOLLIN;
+	ev.events = EPOLLIN | EPOLLHUP | EPOLLERR;
 	ev.data.fd = dev_fd;
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, dev_fd, &ev) < 0) {
 		perror("owlbeard: epoll_ctl(dev_fd)");
@@ -376,6 +376,16 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 
 		/* Process epoll events */
 		for (int i = 0; i < nfds; i++) {
+			if (events[i].data.fd == dev_fd &&
+			    (events[i].events & (EPOLLHUP | EPOLLERR))) {
+				/* Device gone — module unloaded */
+				fprintf(stderr, "owlbeard: device closed "
+					"(module unloaded)\n");
+				epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
+				dev_fd = -1;
+				continue;
+			}
+
 			if (events[i].data.fd == dev_fd) {
 				/* Kernel chardev event */
 				ssize_t n = read(dev_fd, &kmod_event,

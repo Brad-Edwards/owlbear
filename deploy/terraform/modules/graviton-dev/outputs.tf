@@ -10,7 +10,7 @@ output "instance_arn" {
 
 output "ami_id" {
   description = "AMI used"
-  value       = data.aws_ami.al2023_arm64.id
+  value       = data.aws_ami.ubuntu_arm64.id
 }
 
 output "ssm_command" {

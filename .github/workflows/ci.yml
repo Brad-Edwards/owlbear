@@ -228,23 +228,23 @@ jobs:
             --output-s3-key-prefix "ci-output" \
             --parameters commands='[
               "set -euo pipefail",
-              "cd /home/ec2-user/owlbear",
-              "chown -R ec2-user:ec2-user .",
+              "cd /home/ubuntu/owlbear",
+              "chown -R ubuntu:ubuntu .",
               "echo === Git sync ===",
-              "sudo -u ec2-user git fetch origin 2>&1",
-              "sudo -u ec2-user git reset --hard origin/main 2>&1",
-              "sudo -u ec2-user git log --oneline -1",
+              "sudo -u ubuntu git fetch origin 2>&1",
+              "sudo -u ubuntu git reset --hard origin/main 2>&1",
+              "sudo -u ubuntu git log --oneline -1",
               "echo === Build eBPF ===",
-              "sudo -u ec2-user make -C ebpf clean 2>&1 || true",
-              "sudo -u ec2-user make -C ebpf 2>&1",
+              "sudo -u ubuntu make -C ebpf clean 2>&1 || true",
+              "sudo -u ubuntu make -C ebpf 2>&1",
               "echo === Build kernel module ===",
               "make -C kernel clean 2>&1 || true",
               "make -C kernel 2>&1",
               "echo === Build userspace ===",
-              "sudo -u ec2-user make daemon game cheats 2>&1",
+              "sudo -u ubuntu make daemon game cheats 2>&1",
               "echo === Unit tests ===",
-              "sudo -u ec2-user make -C tests clean 2>&1 || true",
-              "sudo -u ec2-user make -C tests unit 2>&1",
+              "sudo -u ubuntu make -C tests clean 2>&1 || true",
+              "sudo -u ubuntu make -C tests unit 2>&1",
               "echo === BUILD OK ==="
             ]' \
             --query 'Command.CommandId' \
@@ -253,7 +253,7 @@ jobs:
           echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
           echo "SSM Command: ${COMMAND_ID}"
 
-          for i in $(seq 1 60); do
+          for i in $(seq 1 120); do
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "$INSTANCE_ID" \

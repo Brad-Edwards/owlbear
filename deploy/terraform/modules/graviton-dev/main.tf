@@ -2,17 +2,18 @@
 # Graviton ARM64 Development Instance
 #
 # c7g.large (Graviton3) for PAC support.
+# Ubuntu 24.04 LTS for kernel 6.8+ BPF LSM hook support.
 # SSM Session Manager access — no SSH keys, no public IP.
 # Auto-shutdown via CloudWatch Events + Lambda.
 # -----------------------------------------------------------------------------
 
-data "aws_ami" "al2023_arm64" {
+data "aws_ami" "ubuntu_arm64" {
   most_recent = true
-  owners      = ["amazon"]
+  owners      = ["099720109477"]  # Canonical
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-arm64"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"]
   }
 
   filter {
@@ -170,7 +171,7 @@ resource "aws_security_group" "instance" {
 # -----------------------------------------------------------------------------
 
 resource "aws_instance" "dev" {
-  ami                    = data.aws_ami.al2023_arm64.id
+  ami                    = data.aws_ami.ubuntu_arm64.id
   instance_type          = var.instance_type
   iam_instance_profile   = aws_iam_instance_profile.instance.name
   vpc_security_group_ids = [aws_security_group.instance.id]

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-15
+
+### Added
+- **WP1b: TracerPid polling for debugger detection** (`daemon/debugger_detect.c`): polls `/proc/<pid>/status` for non-zero `TracerPid` every 5s in the watchdog loop. Detects debuggers that attached before daemon start or via methods eBPF hooks don't cover. Emits `OWL_EVENT_PTRACE_ATTEMPT` with `source=OWL_SRC_DAEMON` on 0-to-nonzero state transition. 6 unit tests (TDD).
+
+### Changed
+- `scripts/verify.sh`: version bumped to v1.2.0
+- `README.md`: updated status (101 tests, 11 suites), added TracerPid mention, removed stale "no anti-debug" limitation
+
 ## [1.1.0] - 2026-03-15
 
 ### Added

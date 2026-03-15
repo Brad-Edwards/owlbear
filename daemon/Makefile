@@ -22,6 +22,7 @@ SRCS     := main.c \
             sig_loader.c \
             integrity.c \
             self_protect.c \
+            debugger_detect.c \
             policy.c \
             scanner.c \
             heartbeat.c

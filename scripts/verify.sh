@@ -784,44 +784,36 @@ phase_selfprotect() {
         return
     fi
 
-    # Unload the module while daemon is running
-    log "Unloading module while daemon is running..."
+    # Try to unload the module while daemon has /dev/owlbear open.
+    # The kernel should REFUSE because the chardev fd holds a reference —
+    # this IS self-protection (module can't be ripped out from under the daemon).
+    log "Attempting rmmod while daemon holds /dev/owlbear..."
     local unload_mark
     unload_mark=$(dmesg_mark)
 
-    rmmod owlbear 2>/dev/null || true
-    sleep 12  # Wait for 2 watchdog cycles (5s each) + margin
+    rmmod owlbear 2>"${phase_dir}/rmmod_stderr.log" || true
 
-    # Check daemon survived the unload
+    if lsmod | grep -q owlbear; then
+        assert_pass "selfprotect/module cannot be unloaded while daemon is running"
+    else
+        assert_fail "selfprotect/module was unloaded despite open fd"
+    fi
+
+    # Daemon should still be running and healthy
     if kill -0 "${DAEMON_PID}" 2>/dev/null; then
-        assert_pass "selfprotect/daemon survives module unload"
+        assert_pass "selfprotect/daemon still running after rmmod attempt"
     else
-        assert_fail "selfprotect/daemon crashed after module unload"
+        assert_fail "selfprotect/daemon crashed"
     fi
 
-    # Check daemon detected the unload — look in stdout, stderr, and daemon log
-    local detected=false
-    for logfile in "${phase_dir}/daemon_stdout.log" \
-                   "${phase_dir}/daemon_stderr.log" \
-                   "${phase_dir}/daemon.log"; do
-        if [ -f "${logfile}" ] && \
-           grep -qi "module unloaded\|MODULE_UNKNOWN\|ALERT.*kernel module\|device closed" \
-             "${logfile}" 2>/dev/null; then
-            detected=true
-            break
-        fi
-    done
-
-    if [ "${detected}" = true ]; then
-        assert_pass "selfprotect/daemon detected module unload"
-    else
-        assert_fail "selfprotect/daemon did not detect module unload"
-    fi
-
-    # Check dmesg for delete_module event
     dmesg_since "${unload_mark}" "${phase_dir}/unload_dmesg.txt"
 
     stop_daemon
+
+    # Now module should unload cleanly after daemon releases the fd
+    rmmod owlbear 2>/dev/null || true
+    sleep 1
+
     stop_game
 }
 

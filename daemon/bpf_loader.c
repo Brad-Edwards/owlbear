@@ -23,6 +23,7 @@
 #include "owlbear_lsm.skel.h"
 #include "owlbear_trace.skel.h"
 #include "owlbear_kprobe.skel.h"
+#include "owlbear_net.skel.h"
 
 /*
  * BPF event structure — must match owlbear_common.bpf.h.
@@ -42,11 +43,13 @@ struct owl_bpf_ctx {
 	struct owlbear_lsm_bpf    *lsm;
 	struct owlbear_trace_bpf  *trace;
 	struct owlbear_kprobe_bpf *kprobe;
+	struct owlbear_net_bpf    *net;
 	struct ring_buffer        *ringbuf;
 
 	bool has_lsm;
 	bool has_trace;
 	bool has_kprobe;
+	bool has_net;
 
 	/* Map fds for populating from userspace */
 	int protected_pids_fd;
@@ -103,6 +106,18 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 		       sizeof(out->payload.module.name) < sizeof(bev->detail)
 		       ? sizeof(out->payload.module.name)
 		       : sizeof(bev->detail));
+		break;
+
+	case OWL_EVENT_NET_CONNECT:
+	case OWL_EVENT_NET_SEND:
+		memcpy(&out->payload.network.dst_addr, bev->detail + 0, 4);
+		memcpy(&out->payload.network.dst_port, bev->detail + 4, 2);
+		memcpy(&out->payload.network.protocol, bev->detail + 6, 2);
+		memcpy(&out->payload.network.bytes,    bev->detail + 8, 8);
+		memcpy(out->payload.network.comm, bev->comm,
+		       sizeof(out->payload.network.comm) < sizeof(bev->comm)
+		       ? sizeof(out->payload.network.comm)
+		       : sizeof(bev->comm));
 		break;
 
 	default:
@@ -173,6 +188,13 @@ static int find_map_fd(struct owl_bpf_ctx *ctx, const char *name)
 	if (fd < 0 && ctx->kprobe) {
 		struct bpf_map *map = bpf_object__find_map_by_name(
 			ctx->kprobe->obj, name);
+		if (map)
+			fd = bpf_map__fd(map);
+	}
+
+	if (fd < 0 && ctx->net) {
+		struct bpf_map *map = bpf_object__find_map_by_name(
+			ctx->net->obj, name);
 		if (map)
 			fd = bpf_map__fd(map);
 	}
@@ -254,8 +276,27 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 		}
 	}
 
+	/* --- Net kprobe skeleton --- */
+	ctx->net = owlbear_net_bpf__open_and_load();
+	if (!ctx->net) {
+		fprintf(stderr, "owlbeard: BPF net load failed: %s\n",
+			strerror(errno));
+	} else {
+		err = owlbear_net_bpf__attach(ctx->net);
+		if (err) {
+			fprintf(stderr, "owlbeard: BPF net attach failed: %s\n",
+				strerror(-err));
+			owlbear_net_bpf__destroy(ctx->net);
+			ctx->net = NULL;
+		} else {
+			ctx->has_net = true;
+			printf("owlbeard: BPF net kprobe programs attached\n");
+		}
+	}
+
 	/* If nothing loaded, still return ctx (degraded mode) */
-	if (!ctx->has_lsm && !ctx->has_trace && !ctx->has_kprobe) {
+	if (!ctx->has_lsm && !ctx->has_trace && !ctx->has_kprobe &&
+	    !ctx->has_net) {
 		fprintf(stderr, "owlbeard: WARNING: no BPF programs loaded, "
 			"running in kmod-only mode\n");
 	}
@@ -292,6 +333,8 @@ void owl_bpf_destroy(struct owl_bpf_ctx *ctx)
 		owlbear_trace_bpf__destroy(ctx->trace);
 	if (ctx->kprobe)
 		owlbear_kprobe_bpf__destroy(ctx->kprobe);
+	if (ctx->net)
+		owlbear_net_bpf__destroy(ctx->net);
 
 	free(ctx);
 }
@@ -343,4 +386,9 @@ bool owl_bpf_has_trace(const struct owl_bpf_ctx *ctx)
 bool owl_bpf_has_kprobe(const struct owl_bpf_ctx *ctx)
 {
 	return ctx && ctx->has_kprobe;
+}
+
+bool owl_bpf_has_net(const struct owl_bpf_ctx *ctx)
+{
+	return ctx && ctx->has_net;
 }

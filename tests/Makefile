@@ -25,7 +25,8 @@ TEST_BINS := test_events \
              test_debugger_detect \
              test_preload_detect \
              test_process_tree \
-             test_hmac_sha256
+             test_hmac_sha256 \
+             test_net_allowlist
 
 .PHONY: all unit integration clean
 
@@ -67,7 +68,7 @@ test_bpf_loader: test_harness.o test_bpf_loader.o $(DAEMON_DIR)/bpf_event_conver
 test_sig_loader: test_harness.o test_sig_loader.o $(DAEMON_DIR)/sig_loader.o $(DAEMON_DIR)/scanner.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
+test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o $(DAEMON_DIR)/net_allowlist.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o $(DAEMON_DIR)/hmac_sha256.o
@@ -87,6 +88,9 @@ test_process_tree: test_harness.o test_process_tree.o $(DAEMON_DIR)/process_tree
 
 test_hmac_sha256: test_harness.o test_hmac_sha256.o $(DAEMON_DIR)/hmac_sha256.o $(DAEMON_DIR)/integrity.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto
+
+test_net_allowlist: test_harness.o test_net_allowlist.o $(DAEMON_DIR)/net_allowlist.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
@@ -108,7 +112,7 @@ clean:
 	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
 	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
 	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o $(DAEMON_DIR)/hmac_sha256.o
-	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
+	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o $(DAEMON_DIR)/net_allowlist.o
 	$(RM) $(DAEMON_DIR)/*.d
 
 -include $(wildcard *.d)

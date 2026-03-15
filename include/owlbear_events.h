@@ -35,6 +35,7 @@
  *   0x0300-0x03FF  ARM64 hardware checks
  *   0x0400-0x04FF  Signature / behavioral detection
  *   0x0500-0x05FF  System health / heartbeat
+ *   0x0600-0x06FF  Network monitoring
  * ----------------------------------------------------------------------- */
 
 enum owlbear_event_type {
@@ -74,6 +75,10 @@ enum owlbear_event_type {
 	OWL_EVENT_HEARTBEAT_MISSED      = 0x0500,
 	OWL_EVENT_EBPF_DETACHED         = 0x0501,
 	OWL_EVENT_KMOD_UNLOADED         = 0x0502,
+
+	/* Network monitoring (0x06xx) */
+	OWL_EVENT_NET_CONNECT           = 0x0600,
+	OWL_EVENT_NET_SEND              = 0x0601,
 };
 
 /* -------------------------------------------------------------------------
@@ -138,6 +143,15 @@ struct owl_payload_signature {
 	__u64 region_base;      /* Base address of scanned region */
 };
 
+/* Network event payload */
+struct owl_payload_network {
+	__u32 dst_addr;         /* IPv4 in network byte order */
+	__u16 dst_port;         /* Port in network byte order */
+	__u16 protocol;         /* IPPROTO_TCP=6, IPPROTO_UDP=17 */
+	__u64 bytes;            /* Bytes sent (0 for connect) */
+	char  comm[48];         /* Process name (extended) */
+};
+
 /* -------------------------------------------------------------------------
  * Main Event Structure
  *
@@ -165,6 +179,7 @@ struct owlbear_event {
 		struct owl_payload_module    module;
 		struct owl_payload_arm64     arm64;
 		struct owl_payload_signature signature;
+		struct owl_payload_network  network;
 		__u8 raw[64];               /* For direct byte access */
 	} payload;
 };

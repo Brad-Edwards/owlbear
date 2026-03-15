@@ -20,7 +20,8 @@ CHEAT_SRCS := mem_reader.c \
               mprotect_inject_via_ptrace.c \
               ld_preload_hook.c \
               debug_reg_setter.c \
-              dev_mem_reader.c
+              dev_mem_reader.c \
+              net_exfil.c
 
 CHEAT_BINS := $(CHEAT_SRCS:.c=.bin)
 CHEAT_DEPS := $(CHEAT_SRCS:.c=.d)

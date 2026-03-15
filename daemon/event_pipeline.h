@@ -16,6 +16,7 @@
 #include <sys/types.h>
 
 #include "owlbear_events.h"
+#include "net_allowlist.h"
 #include "policy.h"
 #include "process_tree.h"
 #include "scanner.h"
@@ -25,12 +26,13 @@
 
 /* Pipeline context */
 struct owl_pipeline {
-	struct owl_policy *policy;
-	struct owl_sig_db *sig_db;
-	struct owl_ptree  *ptree;
-	pid_t              target_pid;
-	bool               enforce;
-	FILE              *log_file;
+	struct owl_policy         *policy;
+	struct owl_sig_db         *sig_db;
+	struct owl_ptree          *ptree;
+	struct owl_net_allowlist  *net_allowlist;
+	pid_t                      target_pid;
+	bool                       enforce;
+	FILE                      *log_file;
 
 	/* Statistics */
 	uint32_t events_processed;
@@ -45,6 +47,7 @@ struct owl_pipeline {
  * @policy:  Policy engine (ownership retained by caller)
  * @sig_db:  Signature database (ownership retained by caller)
  * @ptree:   Process tree (may be NULL; ownership retained by caller)
+ * @al:      Net allowlist (may be NULL; ownership retained by caller)
  * @target:  PID of the protected process
  * @enforce: Whether to take enforcement actions
  * @logf:    Log file (may be NULL for stdout only)
@@ -53,6 +56,7 @@ void owl_pipeline_init(struct owl_pipeline *pipe,
 		       struct owl_policy *policy,
 		       struct owl_sig_db *sig_db,
 		       struct owl_ptree *ptree,
+		       struct owl_net_allowlist *al,
 		       pid_t target, bool enforce, FILE *logf);
 
 /**

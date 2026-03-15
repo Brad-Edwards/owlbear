@@ -17,6 +17,7 @@ CHEAT_SRCS := mem_reader.c \
               ptrace_writer.c \
               vm_writer.c \
               mprotect_injector.c \
+              mprotect_inject_via_ptrace.c \
               ld_preload_hook.c \
               debug_reg_setter.c
 

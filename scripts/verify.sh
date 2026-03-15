@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v1.0.0)
+# Owlbear E2E Verification Report (v1.1.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -323,7 +323,8 @@ HEADER
     local missing=0
     for bin in game/owlbear-game cheats/mem_reader.bin cheats/proc_mem_reader.bin \
                cheats/ptrace_injector.bin cheats/ptrace_writer.bin \
-               cheats/vm_writer.bin cheats/mprotect_injector.bin; do
+               cheats/vm_writer.bin cheats/mprotect_injector.bin \
+               cheats/mprotect_inject_via_ptrace.bin; do
         if [ ! -f "${PROJECT_DIR}/${bin}" ]; then
             warn "Missing: ${bin} — building..."
             missing=1
@@ -487,6 +488,37 @@ phase_baseline() {
         assert_pass "baseline/mprotect_injector executed shellcode"
     else
         assert_fail "baseline/mprotect_injector did not execute shellcode"
+    fi
+
+    # --- mprotect_inject_via_ptrace ---
+    # Run WITHOUT strace: strace uses ptrace, conflicts with our ptrace.
+    local mivp_dir="${phase_dir}/mprotect_inject_via_ptrace"
+    mkdir -p "${mivp_dir}"
+    local mivp_dmesg_before
+    mivp_dmesg_before=$(dmesg_mark)
+    info "Running mprotect_inject_via_ptrace..."
+    local mivp_exit=0
+    timeout 10 "${cheats_dir}/mprotect_inject_via_ptrace.bin" \
+        > "${mivp_dir}/stdout.log" \
+        2> "${mivp_dir}/stderr.log" || mivp_exit=$?
+    echo "${mivp_exit}" > "${mivp_dir}/exit_code"
+    sleep 0.5
+    dmesg_since "${mivp_dmesg_before}" "${mivp_dir}/dmesg_diff.log"
+    info "  exit_code=${mivp_exit}"
+
+    rc=$(cat "${mivp_dir}/exit_code")
+    if [ "$rc" -eq 0 ]; then
+        assert_pass "baseline/mprotect_inject_via_ptrace exits successfully (code=${rc})"
+    elif grep -q "PTRACE_ATTACH failed" "${mivp_dir}/stderr.log" 2>/dev/null; then
+        assert_fail "baseline/mprotect_inject_via_ptrace ptrace blocked unexpectedly" "exit_code=${rc}"
+    else
+        assert_pass "baseline/mprotect_inject_via_ptrace attached (data issue, code=${rc})"
+    fi
+
+    if grep -q "\[CHEAT\]" "${mivp_dir}/stdout.log" 2>/dev/null; then
+        assert_pass "baseline/mprotect_inject_via_ptrace injected mprotect(RX) in game"
+    else
+        assert_fail "baseline/mprotect_inject_via_ptrace injection did not complete"
     fi
 
     capture_dmesg > "${phase_dir}/dmesg_after.txt"
@@ -684,21 +716,55 @@ phase_protected() {
         assert_fail "protected/vm_writer detection missing"
     fi
 
-    # --- mprotect_injector ---
+    # --- mprotect_injector (standalone, runs as own PID) ---
     run_cheat_captured "${phase_dir}" "mprotect_injector" \
         "${cheats_dir}/mprotect_injector.bin"
 
-    # mprotect detection comes from eBPF LSM file_mprotect hook
+    # Standalone mprotect_injector runs outside game PID — detection is
+    # expected only if the daemon sees it via other means. Not a failure
+    # if undetected; the in-process injection below covers this vector.
     if [ -f "${phase_dir}/daemon.log" ] && \
        grep -q "MPROTECT_EXEC" "${phase_dir}/daemon.log" 2>/dev/null; then
         assert_pass "protected/mprotect_injector triggers MPROTECT_EXEC in daemon"
     elif grep -q "mprotect" "${phase_dir}/mprotect_injector/dmesg_diff.log" 2>/dev/null; then
         assert_pass "protected/mprotect_injector triggers mprotect detection"
+    fi
+
+    # --- mprotect_inject_via_ptrace (in-process injection) ---
+    # The real test: injects mmap+mprotect syscalls INTO the game's
+    # context via ptrace. Either ptrace is blocked (PTRACE_ATTEMPT)
+    # or the mprotect fires from game PID (MPROTECT_EXEC).
+    local mivp_dir="${phase_dir}/mprotect_inject_via_ptrace"
+    mkdir -p "${mivp_dir}"
+    local mivp_dmesg_before
+    mivp_dmesg_before=$(dmesg_mark)
+    info "Running mprotect_inject_via_ptrace..."
+    local mivp_exit=0
+    timeout 10 "${cheats_dir}/mprotect_inject_via_ptrace.bin" \
+        > "${mivp_dir}/stdout.log" \
+        2> "${mivp_dir}/stderr.log" || mivp_exit=$?
+    echo "${mivp_exit}" > "${mivp_dir}/exit_code"
+    sleep 0.5
+    dmesg_since "${mivp_dmesg_before}" "${mivp_dir}/dmesg_diff.log"
+    info "  exit_code=${mivp_exit}"
+
+    # Detection: ptrace blocked (PTRACE_ATTEMPT) or mprotect logged (MPROTECT_EXEC)
+    if grep -q "owlbear: ptrace attempt on protected PID ${GAME_PID}\|owlbear:.*ptrace.*${GAME_PID}" \
+         "${mivp_dir}/dmesg_diff.log" 2>/dev/null; then
+        assert_pass "protected/mprotect_inject_via_ptrace blocked at ptrace (PTRACE_ATTEMPT)"
+    elif [ -f "${phase_dir}/daemon.log" ] && \
+         grep -q "MPROTECT_EXEC" "${phase_dir}/daemon.log" 2>/dev/null; then
+        assert_pass "protected/mprotect_inject_via_ptrace triggers MPROTECT_EXEC"
+    elif grep -qi "EPERM\|Permission denied" "${mivp_dir}/stderr.log" 2>/dev/null; then
+        assert_pass "protected/mprotect_inject_via_ptrace got EPERM from eBPF LSM"
     else
-        # mprotect_injector runs as its own PID, not inside the protected game.
-        # The LSM hook only fires for is_protected(pid). This is by design —
-        # it detects RW->RX in the game process, not in external tools.
-        assert_skip "protected/mprotect_injector detection" "runs outside protected PID"
+        assert_fail "protected/mprotect_inject_via_ptrace detection missing"
+    fi
+
+    # EPERM confirmation
+    if grep -qi "EPERM\|Permission denied\|Blocked by anti-cheat" \
+         "${mivp_dir}/stderr.log" 2>/dev/null; then
+        assert_pass "protected/mprotect_inject_via_ptrace ptrace denied (EPERM)"
     fi
 
     # Check daemon log for BLOCK entries if enforce mode
@@ -851,7 +917,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v1.0.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v1.1.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

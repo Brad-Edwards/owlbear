@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v1.2.0)
+# Owlbear E2E Verification Report (v2.0.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -324,7 +324,8 @@ HEADER
     for bin in game/owlbear-game cheats/mem_reader.bin cheats/proc_mem_reader.bin \
                cheats/ptrace_injector.bin cheats/ptrace_writer.bin \
                cheats/vm_writer.bin cheats/mprotect_injector.bin \
-               cheats/mprotect_inject_via_ptrace.bin; do
+               cheats/mprotect_inject_via_ptrace.bin \
+               cheats/dev_mem_reader.bin; do
         if [ ! -f "${PROJECT_DIR}/${bin}" ]; then
             warn "Missing: ${bin} — building..."
             missing=1
@@ -519,6 +520,22 @@ phase_baseline() {
         assert_pass "baseline/mprotect_inject_via_ptrace injected mprotect(RX) in game"
     else
         assert_fail "baseline/mprotect_inject_via_ptrace injection did not complete"
+    fi
+
+    # --- dev_mem_reader ---
+    run_cheat_captured "${phase_dir}" "dev_mem_reader" \
+        "${cheats_dir}/dev_mem_reader.bin"
+
+    rc=$(cat "${phase_dir}/dev_mem_reader/exit_code")
+    if [ "$rc" -eq 0 ]; then
+        assert_pass "baseline/dev_mem_reader reads physical memory (code=${rc})"
+    elif grep -q "EACCES\|Permission denied" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null && \
+         ! grep -q "EPERM" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_skip "baseline/dev_mem_reader" "CONFIG_STRICT_DEVMEM blocks /dev/mem (EACCES)"
+    elif grep -q "No such file" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_skip "baseline/dev_mem_reader" "/dev/mem does not exist"
+    else
+        assert_fail "baseline/dev_mem_reader should succeed or skip without module" "exit_code=${rc}"
     fi
 
     capture_dmesg > "${phase_dir}/dmesg_after.txt"
@@ -767,6 +784,34 @@ phase_protected() {
         assert_pass "protected/mprotect_inject_via_ptrace ptrace denied (EPERM)"
     fi
 
+    # --- dev_mem_reader ---
+    run_cheat_captured "${phase_dir}" "dev_mem_reader" \
+        "${cheats_dir}/dev_mem_reader.bin"
+
+    # Assertion 1: open blocked with EPERM (our hook) or EACCES (kernel config)
+    if grep -q "EPERM" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_pass "protected/dev_mem_reader blocked by eBPF LSM (EPERM)"
+    elif grep -q "EACCES\|Permission denied" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_skip "protected/dev_mem_reader" "CONFIG_STRICT_DEVMEM blocks before LSM (EACCES)"
+    elif grep -q "No such file" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_skip "protected/dev_mem_reader" "/dev/mem does not exist"
+    else
+        assert_fail "protected/dev_mem_reader should be blocked" \
+            "exit_code=$(cat "${phase_dir}/dev_mem_reader/exit_code")"
+    fi
+
+    # Assertion 2: DEV_MEM_ACCESS event in daemon log
+    if grep -q "EPERM" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        if [ -f "${phase_dir}/daemon.log" ] && \
+           grep -q "DEV_MEM_ACCESS" "${phase_dir}/daemon.log" 2>/dev/null; then
+            assert_pass "protected/dev_mem_reader DEV_MEM_ACCESS event in daemon log"
+        else
+            assert_fail "protected/dev_mem_reader DEV_MEM_ACCESS missing from daemon log"
+        fi
+    elif grep -q "EACCES\|Permission denied\|No such file" "${phase_dir}/dev_mem_reader/stderr.log" 2>/dev/null; then
+        assert_skip "protected/dev_mem_reader event check" "kernel blocked before LSM hook"
+    fi
+
     # Check daemon log for BLOCK entries if enforce mode
     if [ -f "${phase_dir}/daemon.log" ]; then
         if grep -q "\[ENFORCE\].*\[BLOCK\]" "${phase_dir}/daemon.log" 2>/dev/null; then
@@ -917,7 +962,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v1.2.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v2.0.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

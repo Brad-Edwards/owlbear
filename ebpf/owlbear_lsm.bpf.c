@@ -8,7 +8,7 @@
  *
  * Hooks:
  *   lsm/ptrace_access_check  — block ptrace on protected PID
- *   lsm/file_open            — block /proc/<pid>/mem access
+ *   lsm/file_open            — block /proc/<pid>/mem, /dev/mem, /dev/kmem
  *   lsm/mmap_file            — monitor executable mmap in game
  *
  * Requires: CONFIG_BPF_LSM=y in kernel config.
@@ -44,11 +44,12 @@ int BPF_PROG(owl_ptrace_check, struct task_struct *child, unsigned int mode)
 /* -------------------------------------------------------------------------
  * LSM: file_open
  *
- * Called when a file is opened. We check if the file is /proc/<pid>/mem
- * for a protected PID. If so, deny access from non-whitelisted callers.
+ * Called when a file is opened. Blocks:
+ *   /dev/mem, /dev/kmem — unconditional (physical memory = system-wide threat)
+ *   /proc/<pid>/mem     — if PID is protected and caller not whitelisted
  *
  * Path checking in BPF is limited — we read the dentry name and check
- * if it equals "mem", then verify the parent directory is a protected PID.
+ * parent/grandparent to distinguish /dev/mem from /proc/<pid>/mem.
  * ----------------------------------------------------------------------- */
 
 SEC("lsm/file_open")
@@ -67,15 +68,20 @@ int BPF_PROG(owl_file_open, struct file *file)
 	if (!dentry)
 		return 0;
 
-	/* Check if filename is "mem" */
+	/* Check if filename is "mem" or "kmem" */
 	dname = BPF_CORE_READ(dentry, d_name);
 	bpf_probe_read_kernel_str(name_buf, sizeof(name_buf), dname.name);
 
-	if (name_buf[0] != 'm' || name_buf[1] != 'e' ||
-	    name_buf[2] != 'm' || name_buf[3] != '\0')
+	bool is_mem  = (name_buf[0] == 'm' && name_buf[1] == 'e' &&
+			name_buf[2] == 'm' && name_buf[3] == '\0');
+	bool is_kmem = (name_buf[0] == 'k' && name_buf[1] == 'm' &&
+			name_buf[2] == 'e' && name_buf[3] == 'm' &&
+			name_buf[4] == '\0');
+
+	if (!is_mem && !is_kmem)
 		return 0;
 
-	/* Get parent directory name (should be the PID) */
+	/* Get parent directory name */
 	parent = BPF_CORE_READ(dentry, d_parent);
 	if (!parent)
 		return 0;
@@ -83,6 +89,26 @@ int BPF_PROG(owl_file_open, struct file *file)
 	parent_name = BPF_CORE_READ(parent, d_name);
 	bpf_probe_read_kernel_str(parent_buf, sizeof(parent_buf),
 				  parent_name.name);
+
+	/*
+	 * /dev/mem or /dev/kmem — unconditional block.
+	 * Physical memory access threatens ALL processes.
+	 */
+	bool is_dev_parent = (parent_buf[0] == 'd' && parent_buf[1] == 'e' &&
+			      parent_buf[2] == 'v' && parent_buf[3] == '\0');
+
+	if (is_dev_parent && (is_mem || is_kmem)) {
+		caller_pid = bpf_get_current_pid_tgid() >> 32;
+		emit_event(OWL_EVENT_DEV_MEM_ACCESS, OWL_SEV_CRITICAL,
+			   caller_pid, 0,
+			   is_kmem ? "BPF LSM: /dev/kmem blocked"
+				   : "BPF LSM: /dev/mem blocked");
+		return -EPERM;
+	}
+
+	/* Only "mem" is relevant under /proc; kmem handled above */
+	if (!is_mem)
+		return 0;
 
 	/*
 	 * Verify parent's parent is "proc" — this distinguishes

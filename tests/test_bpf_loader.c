@@ -103,6 +103,28 @@ TEST(bpf_convert_mprotect_event) {
 	ASSERT_EQ(out.payload.memory.caller_pid, 500);
 }
 
+TEST(bpf_convert_dev_mem_access_event) {
+	struct test_bpf_event bev;
+	struct owlbear_event out;
+
+	memset(&bev, 0, sizeof(bev));
+	bev.event_type = OWL_EVENT_DEV_MEM_ACCESS;
+	bev.severity = OWL_SEV_CRITICAL;
+	bev.pid = 600;
+	bev.target_pid = 0;
+	strncpy(bev.comm, "dev_mem_read", sizeof(bev.comm));
+	strncpy(bev.detail, "BPF LSM: /dev/mem blocked", sizeof(bev.detail));
+
+	int ret = owl_bpf_event_convert(&bev, sizeof(bev), &out);
+	ASSERT_EQ(ret, 0);
+	ASSERT_EQ(out.event_type, OWL_EVENT_DEV_MEM_ACCESS);
+	ASSERT_EQ(out.severity, OWL_SEV_CRITICAL);
+	ASSERT_EQ(out.source, OWL_SRC_EBPF);
+	ASSERT_EQ(out.pid, 600);
+	ASSERT_EQ(out.target_pid, 0);
+	ASSERT_EQ(out.payload.memory.caller_pid, 600);
+}
+
 TEST(bpf_convert_null_input_fails) {
 	struct owlbear_event out;
 
@@ -151,6 +173,7 @@ int main(void)
 	RUN_TEST(bpf_convert_module_load_event);
 	RUN_TEST(bpf_convert_vm_readv_event);
 	RUN_TEST(bpf_convert_mprotect_event);
+	RUN_TEST(bpf_convert_dev_mem_access_event);
 	RUN_TEST(bpf_convert_null_input_fails);
 	RUN_TEST(bpf_convert_null_output_fails);
 	RUN_TEST(bpf_convert_too_small_fails);

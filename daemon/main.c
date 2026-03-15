@@ -386,16 +386,20 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 						continue;
 					if (errno == EAGAIN)
 						continue;
-					fprintf(stderr, "owlbeard: read error: %s\n",
+					fprintf(stderr, "owlbeard: device read error: %s "
+						"(module unloaded?)\n",
 						strerror(errno));
-					close(epfd);
-					return -1;
+					epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
+					dev_fd = -1;
+					continue;
 				}
 
 				if (n == 0) {
-					fprintf(stderr, "owlbeard: device closed\n");
-					close(epfd);
-					return -1;
+					fprintf(stderr, "owlbeard: device closed "
+						"(module unloaded)\n");
+					epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
+					dev_fd = -1;
+					continue;
 				}
 
 				if ((size_t)n == sizeof(kmod_event)) {

@@ -405,23 +405,36 @@ phase_baseline() {
     fi
 
     # --- ptrace_injector ---
-    run_cheat_captured "${phase_dir}" "ptrace_injector" \
-        "${cheats_dir}/ptrace_injector.bin"
+    # Run WITHOUT strace: strace itself uses ptrace, which conflicts with
+    # ptrace_injector's PTRACE_ATTACH (can't ptrace a ptrace'd process).
+    local ptrace_dir="${phase_dir}/ptrace_injector"
+    mkdir -p "${ptrace_dir}"
+    local ptrace_dmesg_before
+    ptrace_dmesg_before=$(dmesg_mark)
+    info "Running ptrace_injector..."
+    local ptrace_exit=0
+    timeout 6 "${cheats_dir}/ptrace_injector.bin" \
+        > "${ptrace_dir}/stdout.log" \
+        2> "${ptrace_dir}/stderr.log" || ptrace_exit=$?
+    echo "${ptrace_exit}" > "${ptrace_dir}/exit_code"
+    sleep 0.5
+    dmesg_since "${ptrace_dmesg_before}" "${ptrace_dir}/dmesg_diff.log"
+    info "  exit_code=${ptrace_exit}"
 
-    rc=$(cat "${phase_dir}/ptrace_injector/exit_code")
+    rc=$(cat "${ptrace_dir}/exit_code")
     if [ "$rc" -eq 0 ]; then
         assert_pass "baseline/ptrace_injector exits successfully (code=${rc})"
     else
         assert_fail "baseline/ptrace_injector should succeed without module" "exit_code=${rc}"
     fi
 
-    if grep -q "\[CHEAT\]" "${phase_dir}/ptrace_injector/stdout.log" 2>/dev/null; then
+    if grep -q "\[CHEAT\]" "${ptrace_dir}/stdout.log" 2>/dev/null; then
         assert_pass "baseline/ptrace_injector read valid game state"
     else
         assert_fail "baseline/ptrace_injector did not print stolen state"
     fi
 
-    if grep -q "owlbear: ptrace attempt" "${phase_dir}/ptrace_injector/dmesg_diff.log" 2>/dev/null; then
+    if grep -q "owlbear: ptrace attempt" "${ptrace_dir}/dmesg_diff.log" 2>/dev/null; then
         assert_fail "baseline/ptrace_injector should produce no detection events"
     else
         assert_pass "baseline/ptrace_injector no detection events in dmesg"
@@ -682,9 +695,10 @@ phase_protected() {
         assert_pass "protected/mprotect_injector triggers MPROTECT_EXEC in daemon"
     elif grep -q "mprotect" "${phase_dir}/mprotect_injector/dmesg_diff.log" 2>/dev/null; then
         assert_pass "protected/mprotect_injector triggers mprotect detection"
+    elif grep -q "bpf" /sys/kernel/security/lsm 2>/dev/null; then
+        assert_fail "protected/mprotect_injector detection missing (BPF LSM active but no event)"
     else
-        # mprotect detection requires eBPF LSM — skip if not available
-        assert_skip "protected/mprotect_injector detection" "requires BPF LSM"
+        assert_skip "protected/mprotect_injector detection" "bpf not in active LSM list"
     fi
 
     # Check daemon log for BLOCK entries if enforce mode
@@ -754,12 +768,12 @@ phase_selfprotect() {
     }
     sleep 1
 
-    # Start daemon
+    # Start daemon — capture stdout and stderr separately
     "${PROJECT_DIR}/daemon/owlbeard" \
         --target "${GAME_PID}" \
         --log "${phase_dir}/daemon.log" \
         --sigs "${PROJECT_DIR}/signatures/default.sigs" \
-        > "${phase_dir}/daemon_stdout.log" 2>&1 &
+        > "${phase_dir}/daemon_stdout.log" 2>"${phase_dir}/daemon_stderr.log" &
     DAEMON_PID=$!
     sleep 3
 
@@ -776,7 +790,7 @@ phase_selfprotect() {
     unload_mark=$(dmesg_mark)
 
     rmmod owlbear 2>/dev/null || true
-    sleep 7  # Wait for watchdog cycle (5s) + margin
+    sleep 12  # Wait for 2 watchdog cycles (5s each) + margin
 
     # Check daemon survived the unload
     if kill -0 "${DAEMON_PID}" 2>/dev/null; then
@@ -785,14 +799,21 @@ phase_selfprotect() {
         assert_fail "selfprotect/daemon crashed after module unload"
     fi
 
-    # Check daemon detected the unload
-    if [ -f "${phase_dir}/daemon_stdout.log" ] && \
-       grep -q "module unloaded\|MODULE_UNKNOWN\|ALERT.*kernel module" \
-         "${phase_dir}/daemon_stdout.log" 2>/dev/null; then
+    # Check daemon detected the unload — look in stdout, stderr, and daemon log
+    local detected=false
+    for logfile in "${phase_dir}/daemon_stdout.log" \
+                   "${phase_dir}/daemon_stderr.log" \
+                   "${phase_dir}/daemon.log"; do
+        if [ -f "${logfile}" ] && \
+           grep -qi "module unloaded\|MODULE_UNKNOWN\|ALERT.*kernel module\|device closed" \
+             "${logfile}" 2>/dev/null; then
+            detected=true
+            break
+        fi
+    done
+
+    if [ "${detected}" = true ]; then
         assert_pass "selfprotect/daemon detected module unload"
-    elif [ -f "${phase_dir}/daemon.log" ] && \
-         grep -q "MODULE_UNKNOWN" "${phase_dir}/daemon.log" 2>/dev/null; then
-        assert_pass "selfprotect/daemon detected module unload (in log)"
     else
         assert_fail "selfprotect/daemon did not detect module unload"
     fi

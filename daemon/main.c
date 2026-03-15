@@ -31,6 +31,7 @@
 #include "policy.h"
 #include "scanner.h"
 #include "self_protect.h"
+#include "debugger_detect.h"
 #include "sig_loader.h"
 
 /* -------------------------------------------------------------------------
@@ -322,6 +323,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		      struct owl_pipeline *pipeline,
 		      struct owl_integrity *integrity,
 		      struct owl_self_protect *selfprot,
+		      struct owl_debugger_detect *dbg_detect,
 		      FILE *log_file)
 {
 	int epfd;
@@ -504,6 +506,33 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 				if (log_file)
 					print_event(&be, log_file);
 			}
+
+			/* TracerPid debugger detection */
+			if (dbg_detect) {
+				int dbg_result = owl_debugger_detect_check(dbg_detect);
+				if (dbg_result & 0x01) {
+					printf("owlbeard: [ALERT] debugger attached (TracerPid=%d)!\n",
+					       dbg_detect->last_tracer);
+
+					struct owlbear_event de;
+					struct timespec ts;
+					memset(&de, 0, sizeof(de));
+					clock_gettime(CLOCK_MONOTONIC, &ts);
+					de.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
+							  (uint64_t)ts.tv_nsec;
+					de.event_type = OWL_EVENT_PTRACE_ATTEMPT;
+					de.severity = OWL_SEV_CRITICAL;
+					de.source = OWL_SRC_DAEMON;
+					de.pid = (uint32_t)dbg_detect->last_tracer;
+					de.target_pid = (uint32_t)pipeline->target_pid;
+					de.payload.memory.caller_pid = (uint32_t)dbg_detect->last_tracer;
+
+					print_event(&de, stdout);
+					if (log_file)
+						print_event(&de, log_file);
+					owl_pipeline_process(pipeline, &de);
+				}
+			}
 		}
 	}
 
@@ -650,6 +679,7 @@ int main(int argc, char *argv[])
 	struct owl_pipeline pipeline;
 	struct owl_integrity integrity;
 	struct owl_self_protect selfprot;
+	struct owl_debugger_detect dbg_detect;
 	struct owl_bpf_ctx *bpf = NULL;
 
 	if (parse_args(argc, argv, &cfg) < 0)
@@ -738,13 +768,16 @@ int main(int argc, char *argv[])
 	/* Initialize self-protection */
 	owl_selfprotect_init(&selfprot, dev_fd, owl_bpf_ringbuf_fd(bpf));
 
+	/* Initialize debugger detection */
+	owl_debugger_detect_init(&dbg_detect, cfg.target_pid);
+
 	printf("owlbeard: ready (pid=%d, target=%d, mode=%s)\n",
 	       getpid(), cfg.target_pid,
 	       cfg.enforce ? "enforce" : "observe");
 
 	/* Run the event loop */
 	ret = event_loop(dev_fd, bpf, &pipeline, &integrity, &selfprot,
-			 log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+			 &dbg_detect, log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	printf("owlbeard: shutting down (events=%u, blocks=%u, kills=%u, sigs=%u)\n",
 	       pipeline.events_processed, pipeline.actions_block,

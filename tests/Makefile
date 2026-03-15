@@ -21,7 +21,8 @@ TEST_BINS := test_events \
              test_sig_loader \
              test_event_pipeline \
              test_integrity \
-             test_self_protect
+             test_self_protect \
+             test_debugger_detect
 
 .PHONY: all unit integration clean
 
@@ -72,6 +73,9 @@ test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o
 test_self_protect: test_harness.o test_self_protect.o $(DAEMON_DIR)/self_protect.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+test_debugger_detect: test_harness.o test_debugger_detect.o $(DAEMON_DIR)/debugger_detect.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
@@ -92,7 +96,7 @@ clean:
 	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
 	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
 	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o
-	$(RM) $(DAEMON_DIR)/self_protect.o
+	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o
 	$(RM) $(DAEMON_DIR)/*.d
 
 -include $(wildcard *.d)

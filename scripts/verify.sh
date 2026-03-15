@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v1.1.0)
+# Owlbear E2E Verification Report (v1.2.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -917,7 +917,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v1.1.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v1.2.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

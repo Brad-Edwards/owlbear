@@ -10,7 +10,7 @@ Runs on Graviton3 (c7g.large), Ubuntu 24.04, kernel 6.17.
 
 - **kernel/** - loadable module. Kprobes on ptrace, /proc/pid/mem, process_vm_readv/writev, mmap, module load/unload. ARM64 system register monitoring. Chardev for event delivery.
 - **ebpf/** - BPF LSM hooks returning -EPERM (ptrace_access_check, file_open, file_mprotect). Tracepoints. Kprobe on do_init_module. Ring buffer to userspace.
-- **daemon/** - epoll on chardev + BPF ring buffer. Policy engine. Signature scanner. CRC32 code integrity. Self-protection watchdog.
+- **daemon/** - epoll on chardev + BPF ring buffer. Policy engine. Signature scanner. CRC32 code integrity. Self-protection watchdog. TracerPid debugger detection.
 - **game/** - ncurses test target. Mutable state, function pointers, exported address.
 - **cheats/** - 8 attack programs: process_vm_readv, /proc/pid/mem, ptrace read, ptrace write, process_vm_writev, LD_PRELOAD, mprotect injection, debug registers.
 - **platform/** - Lambda + API Gateway + DynamoDB telemetry receiver.
@@ -18,9 +18,9 @@ Runs on Graviton3 (c7g.large), Ubuntu 24.04, kernel 6.17.
 
 ## Status
 
-v1.0.0. 95 unit tests, 10 suites. 30/31 E2E pass on Graviton3. eBPF LSM returns EPERM on ptrace, /proc/pid/mem, process_vm_writev. Module can't be unloaded while daemon runs.
+v1.2.0. 101 unit tests, 11 suites. 30/31 E2E pass on Graviton3. eBPF LSM returns EPERM on ptrace, /proc/pid/mem, process_vm_writev. Module can't be unloaded while daemon runs. TracerPid polling detects debuggers attached before daemon start.
 
-Prototype limitations: linear signature scan, CRC32 not cryptographic, no fleet management, no anti-debug beyond prctl.
+Prototype limitations: linear signature scan, CRC32 not cryptographic, no fleet management.
 
 ## Getting started
 

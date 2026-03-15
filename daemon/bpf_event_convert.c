@@ -51,6 +51,7 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 	case OWL_EVENT_VM_READV_ATTEMPT:
 	case OWL_EVENT_VM_WRITEV_ATTEMPT:
 	case OWL_EVENT_MPROTECT_EXEC:
+	case OWL_EVENT_DEV_MEM_ACCESS:
 		out->payload.memory.caller_pid = bev->pid;
 		memcpy(out->payload.memory.caller_comm, bev->comm,
 		       sizeof(out->payload.memory.caller_comm) < sizeof(bev->comm)

@@ -99,6 +99,7 @@ static const char *event_type_str(uint32_t type)
 	case OWL_EVENT_VM_WRITEV_ATTEMPT:    return "VM_WRITEV_ATTEMPT";
 	case OWL_EVENT_EXEC_MMAP:            return "EXEC_MMAP";
 	case OWL_EVENT_MPROTECT_EXEC:        return "MPROTECT_EXEC";
+	case OWL_EVENT_DEV_MEM_ACCESS:       return "DEV_MEM_ACCESS";
 	case OWL_EVENT_MODULE_LOAD:          return "MODULE_LOAD";
 	case OWL_EVENT_MODULE_UNKNOWN:       return "MODULE_UNKNOWN";
 	case OWL_EVENT_CODE_INTEGRITY_FAIL:  return "CODE_INTEGRITY_FAIL";
@@ -181,6 +182,7 @@ static void print_event(const struct owlbear_event *ev, FILE *out)
 	case OWL_EVENT_VM_READV_ATTEMPT:
 	case OWL_EVENT_VM_WRITEV_ATTEMPT:
 	case OWL_EVENT_MPROTECT_EXEC:
+	case OWL_EVENT_DEV_MEM_ACCESS:
 		fprintf(out, " caller_pid=%u caller=%s",
 			ev->payload.memory.caller_pid,
 			ev->payload.memory.caller_comm);

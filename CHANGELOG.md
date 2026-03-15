@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-15
+
+### Added
+- **WP1c: Block /dev/mem and /dev/kmem via eBPF LSM** (`ebpf/owlbear_lsm.bpf.c`): extends `file_open` hook to unconditionally block `/dev/mem` and `/dev/kmem` opens with -EPERM. Physical memory access bypasses all process-level protections, so no PID allowlist check is performed. Emits `OWL_EVENT_DEV_MEM_ACCESS` (severity CRITICAL, target_pid=0). Detail string distinguishes `/dev/mem` vs `/dev/kmem`.
+- `OWL_EVENT_DEV_MEM_ACCESS` (0x0106) in shared event header and BPF common header (breaking: new event type)
+- `cheats/dev_mem_reader.c`: attack program that attempts to open `/dev/mem` and `/dev/kmem` and read 256 bytes of raw physical memory
+- `tests/test_bpf_loader.c`: conversion test for `OWL_EVENT_DEV_MEM_ACCESS` (102 total tests)
+- `scripts/verify.sh`: baseline and protected phase assertions for dev_mem_reader, handles CONFIG_STRICT_DEVMEM (EACCES) gracefully
+
+### Changed
+- `daemon/bpf_event_convert.c`: `OWL_EVENT_DEV_MEM_ACCESS` falls through to memory payload conversion
+- `daemon/main.c`: `event_type_str()` and `print_event()` handle `DEV_MEM_ACCESS`
+- `cheats/Makefile`: builds `dev_mem_reader.bin`
+- `scripts/verify.sh`: version bumped to v2.0.0
+- `README.md`: updated status (v2.0.0, 102 tests, 9 attack programs), added /dev/mem blocking
+
 ## [1.2.0] - 2026-03-15
 
 ### Added

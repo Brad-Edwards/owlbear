@@ -50,6 +50,7 @@ enum owlbear_event_type {
 	OWL_EVENT_VM_WRITEV_ATTEMPT     = 0x0103,
 	OWL_EVENT_EXEC_MMAP             = 0x0104,
 	OWL_EVENT_MPROTECT_EXEC         = 0x0105,
+	OWL_EVENT_DEV_MEM_ACCESS        = 0x0106,
 
 	/* Integrity checks (0x02xx) */
 	OWL_EVENT_MODULE_LOAD           = 0x0200,

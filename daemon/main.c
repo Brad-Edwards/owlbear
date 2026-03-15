@@ -35,6 +35,8 @@
 #include "scanner.h"
 #include "self_protect.h"
 #include "debugger_detect.h"
+#include "clock_validator.h"
+#include "vdso_integrity.h"
 #include "sig_loader.h"
 
 /* -------------------------------------------------------------------------
@@ -120,6 +122,8 @@ static const char *event_type_str(uint32_t type)
 	case OWL_EVENT_KMOD_UNLOADED:        return "KMOD_UNLOADED";
 	case OWL_EVENT_NET_CONNECT:          return "NET_CONNECT";
 	case OWL_EVENT_NET_SEND:             return "NET_SEND";
+	case OWL_EVENT_CLOCK_DRIFT:          return "CLOCK_DRIFT";
+	case OWL_EVENT_VDSO_TAMPER:          return "VDSO_TAMPER";
 	default:                             return "UNKNOWN";
 	}
 }
@@ -206,6 +210,8 @@ static void print_event(const struct owlbear_event *ev, FILE *out)
 	case OWL_EVENT_PAC_KEY_CHANGED:
 	case OWL_EVENT_VBAR_MODIFIED:
 	case OWL_EVENT_WXN_DISABLED:
+	case OWL_EVENT_CLOCK_DRIFT:
+	case OWL_EVENT_VDSO_TAMPER:
 		fprintf(out, " reg=%u expected=0x%llx actual=0x%llx desc=%s",
 			ev->payload.arm64.register_id,
 			(unsigned long long)ev->payload.arm64.expected,
@@ -344,6 +350,8 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		      struct owl_integrity *integrity,
 		      struct owl_self_protect *selfprot,
 		      struct owl_debugger_detect *dbg_detect,
+		      struct owl_clock_validator *clock_val,
+		      struct owl_vdso_integrity *vdso_integ,
 		      FILE *log_file)
 {
 	int epfd;
@@ -481,6 +489,33 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					owl_pipeline_process(pipeline, &ie);
 				}
 			}
+
+			/* vDSO integrity check (30s periodic) */
+			if (vdso_integ && vdso_integ->baseline_set) {
+				int vc = owl_vdso_integrity_check(vdso_integ);
+				if (vc == 1) {
+					printf("owlbeard: [ALERT] vDSO tamper detected!\n");
+
+					struct owlbear_event ve;
+					struct timespec ts;
+					memset(&ve, 0, sizeof(ve));
+					clock_gettime(CLOCK_MONOTONIC, &ts);
+					ve.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
+							  (uint64_t)ts.tv_nsec;
+					ve.event_type = OWL_EVENT_VDSO_TAMPER;
+					ve.severity = OWL_SEV_CRITICAL;
+					ve.source = OWL_SRC_DAEMON;
+					ve.target_pid = (uint32_t)pipeline->target_pid;
+					snprintf(ve.payload.arm64.description,
+						 sizeof(ve.payload.arm64.description),
+						 "vDSO HMAC mismatch");
+
+					print_event(&ve, stdout);
+					if (log_file)
+						print_event(&ve, log_file);
+					owl_pipeline_process(pipeline, &ve);
+				}
+			}
 		}
 
 		/* Self-protection watchdog every 5s */
@@ -551,6 +586,33 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					if (log_file)
 						print_event(&de, log_file);
 					owl_pipeline_process(pipeline, &de);
+				}
+			}
+
+			/* Clock drift detection (5s watchdog) */
+			if (clock_val) {
+				int clk_result = owl_clock_validator_check(clock_val);
+				if (clk_result & 0x01) {
+					printf("owlbeard: [ALERT] clock drift detected!\n");
+
+					struct owlbear_event ce;
+					struct timespec ts;
+					memset(&ce, 0, sizeof(ce));
+					clock_gettime(CLOCK_MONOTONIC, &ts);
+					ce.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
+							  (uint64_t)ts.tv_nsec;
+					ce.event_type = OWL_EVENT_CLOCK_DRIFT;
+					ce.severity = OWL_SEV_CRITICAL;
+					ce.source = OWL_SRC_DAEMON;
+					ce.target_pid = (uint32_t)pipeline->target_pid;
+					snprintf(ce.payload.arm64.description,
+						 sizeof(ce.payload.arm64.description),
+						 "MONO vs RAW drift >50ms");
+
+					print_event(&ce, stdout);
+					if (log_file)
+						print_event(&ce, log_file);
+					owl_pipeline_process(pipeline, &ce);
 				}
 			}
 		}
@@ -667,6 +729,12 @@ static void setup_default_policy(struct owl_policy *policy, bool enforce)
 		/* Kill on critical integrity violations */
 		owl_policy_add_rule(policy, OWL_EVENT_CODE_INTEGRITY_FAIL,
 				    OWL_SEV_CRITICAL, OWL_ACT_KILL);
+
+		/* Kill on critical speed hack detections */
+		owl_policy_add_rule(policy, OWL_EVENT_CLOCK_DRIFT,
+				    OWL_SEV_CRITICAL, OWL_ACT_KILL);
+		owl_policy_add_rule(policy, OWL_EVENT_VDSO_TAMPER,
+				    OWL_SEV_CRITICAL, OWL_ACT_KILL);
 	}
 
 	/* Always log signature matches */
@@ -683,6 +751,12 @@ static void setup_default_policy(struct owl_policy *policy, bool enforce)
 	owl_policy_add_rule(policy, OWL_EVENT_NET_CONNECT,
 			    OWL_SEV_INFO, OWL_ACT_LOG);
 	owl_policy_add_rule(policy, OWL_EVENT_NET_SEND,
+			    OWL_SEV_INFO, OWL_ACT_LOG);
+
+	/* Log speed hack / time integrity events */
+	owl_policy_add_rule(policy, OWL_EVENT_CLOCK_DRIFT,
+			    OWL_SEV_INFO, OWL_ACT_LOG);
+	owl_policy_add_rule(policy, OWL_EVENT_VDSO_TAMPER,
 			    OWL_SEV_INFO, OWL_ACT_LOG);
 
 	/* Log ARM64 hardware anomalies */
@@ -708,6 +782,8 @@ int main(int argc, char *argv[])
 	struct owl_integrity integrity;
 	struct owl_self_protect selfprot;
 	struct owl_debugger_detect dbg_detect;
+	struct owl_clock_validator clock_val;
+	struct owl_vdso_integrity vdso_integ;
 	struct owl_bpf_ctx *bpf = NULL;
 
 	if (parse_args(argc, argv, &cfg) < 0)
@@ -808,13 +884,23 @@ int main(int argc, char *argv[])
 	/* Initialize debugger detection */
 	owl_debugger_detect_init(&dbg_detect, cfg.target_pid);
 
+	/* Initialize clock drift detection */
+	owl_clock_validator_init(&clock_val, cfg.target_pid);
+
+	/* Initialize vDSO integrity */
+	owl_vdso_integrity_init(&vdso_integ, cfg.target_pid);
+	if (owl_vdso_integrity_baseline(&vdso_integ, cfg.target_pid) < 0) {
+		fprintf(stderr, "owlbeard: vdso baseline failed (non-fatal)\n");
+	}
+
 	printf("owlbeard: ready (pid=%d, target=%d, mode=%s)\n",
 	       getpid(), cfg.target_pid,
 	       cfg.enforce ? "enforce" : "observe");
 
 	/* Run the event loop */
 	ret = event_loop(dev_fd, bpf, &pipeline, &integrity, &selfprot,
-			 &dbg_detect, log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+			 &dbg_detect, &clock_val, &vdso_integ,
+			 log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	printf("owlbeard: shutting down (events=%u, blocks=%u, kills=%u, sigs=%u)\n",
 	       pipeline.events_processed, pipeline.actions_block,

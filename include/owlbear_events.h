@@ -36,6 +36,7 @@
  *   0x0400-0x04FF  Signature / behavioral detection
  *   0x0500-0x05FF  System health / heartbeat
  *   0x0600-0x06FF  Network monitoring
+ *   0x0700-0x07FF  Speed hack / time integrity
  * ----------------------------------------------------------------------- */
 
 enum owlbear_event_type {
@@ -79,6 +80,10 @@ enum owlbear_event_type {
 	/* Network monitoring (0x06xx) */
 	OWL_EVENT_NET_CONNECT           = 0x0600,
 	OWL_EVENT_NET_SEND              = 0x0601,
+
+	/* Speed hack / time integrity (0x07xx) */
+	OWL_EVENT_CLOCK_DRIFT           = 0x0700,
+	OWL_EVENT_VDSO_TAMPER           = 0x0701,
 };
 
 /* -------------------------------------------------------------------------

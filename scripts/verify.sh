@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v2.4.0)
+# Owlbear E2E Verification Report (v2.5.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -327,7 +327,8 @@ HEADER
                cheats/mprotect_inject_via_ptrace.bin \
                cheats/dev_mem_reader.bin \
                cheats/ld_preload_hook.bin \
-               cheats/net_exfil.bin; do
+               cheats/net_exfil.bin \
+               cheats/speed_hack.bin; do
         if [ ! -f "${PROJECT_DIR}/${bin}" ]; then
             warn "Missing: ${bin} — building..."
             missing=1
@@ -561,6 +562,18 @@ phase_baseline() {
         assert_pass "baseline/net_exfil UDP send succeeds unprotected (code=${rc})"
     else
         assert_fail "baseline/net_exfil should succeed without module" "exit_code=${rc}"
+    fi
+
+    # --- speed_hack (baseline) ---
+    run_cheat_captured "${phase_dir}" "speed_hack" \
+        "${cheats_dir}/speed_hack.bin" \
+        "${PROJECT_DIR}/game/owlbear-game" "--no-curses"
+
+    rc=$(cat "${phase_dir}/speed_hack/exit_code")
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]; then
+        assert_pass "baseline/speed_hack runs without module (code=${rc})"
+    else
+        assert_fail "baseline/speed_hack should succeed without module" "exit_code=${rc}"
     fi
 
     capture_dmesg > "${phase_dir}/dmesg_after.txt"
@@ -874,6 +887,23 @@ phase_protected() {
             "net_exfil PID not in protected_pids map (expected for separate process)"
     fi
 
+    # --- speed_hack (protected) ---
+    run_cheat_captured "${phase_dir}" "speed_hack" \
+        "${cheats_dir}/speed_hack.bin" \
+        "${PROJECT_DIR}/game/owlbear-game" "--no-curses"
+
+    sleep 1  # daemon processes exec event async
+
+    if [ -f "${phase_dir}/daemon.log" ] && \
+       grep -q "LIB_UNEXPECTED" "${phase_dir}/daemon.log" 2>/dev/null; then
+        assert_pass "protected/speed_hack triggers LIB_UNEXPECTED detection"
+    elif [ -f "${phase_dir}/daemon_stdout.log" ] && \
+       grep -q "LIB_UNEXPECTED" "${phase_dir}/daemon_stdout.log" 2>/dev/null; then
+        assert_pass "protected/speed_hack triggers LIB_UNEXPECTED (stdout)"
+    else
+        assert_fail "protected/speed_hack LIB_UNEXPECTED detection missing"
+    fi
+
     # Check daemon log for BLOCK entries if enforce mode
     if [ -f "${phase_dir}/daemon.log" ]; then
         if grep -q "\[ENFORCE\].*\[BLOCK\]" "${phase_dir}/daemon.log" 2>/dev/null; then
@@ -1033,7 +1063,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v2.4.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v2.5.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

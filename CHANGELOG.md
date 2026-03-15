@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-15
+
+### Added
+- WP4: Speed hack detection via multi-clock drift and vDSO integrity
+- `daemon/clock_validator.{h,c}`: CLOCK_MONOTONIC vs CLOCK_MONOTONIC_RAW drift detection with 50ms threshold; ARM64 CNTVCT_EL0 cross-check via inline `mrs` instructions
+- `daemon/vdso_integrity.{h,c}`: HMAC-SHA256 baseline/check of [vdso] mapping pages; detects runtime vDSO patching (speed hacks bypassing LD_PRELOAD)
+- `OWL_EVENT_CLOCK_DRIFT` (0x0700), `OWL_EVENT_VDSO_TAMPER` (0x0701) event types
+- `cheats/speed_hook_so.c`: LD_PRELOAD .so that intercepts `clock_gettime(CLOCK_MONOTONIC)` and returns 2x elapsed time
+- `cheats/speed_hack.c`: launcher that sets `LD_PRELOAD=speed_hook.so` and execs game
+- `tests/test_clock_validator.c`: 7 unit tests (TDD) — drift computation, init, null handling
+- `tests/test_vdso_integrity.c`: 5 unit tests (TDD) — maps parsing, init, buffer tamper detection
+- 2 E2E assertions in `scripts/verify.sh` for speed_hack baseline + protected phases
+
+### Changed
+- `include/owlbear_events.h`: added 0x0700 range comment, CLOCK_DRIFT and VDSO_TAMPER event types
+- `daemon/main.c`: clock_validator and vdso_integrity includes, init, event_loop integration (clock check 5s watchdog, vDSO check 30s periodic), event_type_str/print_event cases, policy rules
+- `daemon/Makefile`: added `clock_validator.c`, `vdso_integrity.c` to SRCS
+- `tests/Makefile`: added `test_clock_validator`, `test_vdso_integrity` test suites
+- `cheats/Makefile`: added `speed_hack.c` to CHEAT_SRCS, `speed_hook.so` build rule with `-ldl`
+- `scripts/verify.sh`: version bumped to v2.5.0, added speed_hack to preflight + E2E phases
+
 ## [2.4.0] - 2026-03-15
 
 ### Added

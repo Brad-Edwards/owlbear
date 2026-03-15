@@ -26,7 +26,9 @@ TEST_BINS := test_events \
              test_preload_detect \
              test_process_tree \
              test_hmac_sha256 \
-             test_net_allowlist
+             test_net_allowlist \
+             test_clock_validator \
+             test_vdso_integrity
 
 .PHONY: all unit integration clean
 
@@ -92,6 +94,12 @@ test_hmac_sha256: test_harness.o test_hmac_sha256.o $(DAEMON_DIR)/hmac_sha256.o 
 test_net_allowlist: test_harness.o test_net_allowlist.o $(DAEMON_DIR)/net_allowlist.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+test_clock_validator: test_harness.o test_clock_validator.o $(DAEMON_DIR)/clock_validator.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_vdso_integrity: test_harness.o test_vdso_integrity.o $(DAEMON_DIR)/vdso_integrity.o $(DAEMON_DIR)/hmac_sha256.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto
+
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
@@ -113,6 +121,7 @@ clean:
 	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
 	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o $(DAEMON_DIR)/hmac_sha256.o
 	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o $(DAEMON_DIR)/net_allowlist.o
+	$(RM) $(DAEMON_DIR)/clock_validator.o $(DAEMON_DIR)/vdso_integrity.o
 	$(RM) $(DAEMON_DIR)/*.d
 
 -include $(wildcard *.d)

@@ -21,19 +21,21 @@ CHEAT_SRCS := mem_reader.c \
               ld_preload_hook.c \
               debug_reg_setter.c \
               dev_mem_reader.c \
-              net_exfil.c
+              net_exfil.c \
+              speed_hack.c
 
 CHEAT_BINS := $(CHEAT_SRCS:.c=.bin)
 CHEAT_DEPS := $(CHEAT_SRCS:.c=.d)
 
-# The LD_PRELOAD shared object
+# The LD_PRELOAD shared objects
 PRELOAD_SO := preload_hook.so
+SPEED_SO   := speed_hook.so
 
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
 .PHONY: all clean kernel_cheat
 
-all: $(CHEAT_BINS) $(PRELOAD_SO)
+all: $(CHEAT_BINS) $(PRELOAD_SO) $(SPEED_SO)
 
 %.bin: %.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -o $@ $< $(LDFLAGS)
@@ -41,11 +43,14 @@ all: $(CHEAT_BINS) $(PRELOAD_SO)
 $(PRELOAD_SO): preload_hook_so.c
 	$(CC) $(CFLAGS) -shared -fPIC -o $@ $<
 
+$(SPEED_SO): speed_hook_so.c
+	$(CC) $(CFLAGS) -shared -fPIC -o $@ $< -ldl
+
 kernel_cheat:
 	$(MAKE) -C $(KDIR) M=$(CURDIR)/kernel_reader modules
 
 clean:
-	$(RM) $(CHEAT_BINS) $(PRELOAD_SO) $(CHEAT_DEPS) *.o
+	$(RM) $(CHEAT_BINS) $(PRELOAD_SO) $(SPEED_SO) $(CHEAT_DEPS) *.o
 	-$(MAKE) -C $(KDIR) M=$(CURDIR)/kernel_reader clean 2>/dev/null || true
 
 -include $(CHEAT_DEPS)

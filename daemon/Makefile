@@ -26,6 +26,8 @@ SRCS     := main.c \
             self_protect.c \
             debugger_detect.c \
             preload_detect.c \
+            clock_validator.c \
+            vdso_integrity.c \
             policy.c \
             scanner.c \
             heartbeat.c \

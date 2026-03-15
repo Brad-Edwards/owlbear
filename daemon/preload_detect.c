@@ -56,16 +56,29 @@ int owl_check_preload_env(pid_t pid, char *value_out, size_t value_len)
 	char path[64];
 	snprintf(path, sizeof(path), "/proc/%d/environ", (int)pid);
 
-	int fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return -1;
+	/*
+	 * Retry with backoff: the exec tracepoint fires during execve()
+	 * processing, so /proc/<pid>/environ may not be readable yet
+	 * (kernel/loader still setting up the new process image).
+	 */
+	for (int attempt = 0; attempt < 3; attempt++) {
+		if (attempt > 0)
+			usleep(50000); /* 50ms backoff */
 
-	char buf[ENVIRON_MAX_SIZE];
-	ssize_t n = read(fd, buf, sizeof(buf));
-	close(fd);
+		int fd = open(path, O_RDONLY);
+		if (fd < 0)
+			continue;
 
-	if (n <= 0)
-		return -1;
+		char buf[ENVIRON_MAX_SIZE];
+		ssize_t n = read(fd, buf, sizeof(buf));
+		close(fd);
 
-	return owl_scan_environ_for_preload(buf, (size_t)n, value_out, value_len);
+		if (n <= 0)
+			continue;
+
+		return owl_scan_environ_for_preload(buf, (size_t)n,
+						     value_out, value_len);
+	}
+
+	return -1;
 }

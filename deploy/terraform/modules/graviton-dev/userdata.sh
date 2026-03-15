@@ -29,6 +29,7 @@ apt-get install -y -qq \
   tmux \
   htop \
   zlib1g-dev \
+  libssl-dev \
   unzip
 
 # AWS CLI v2

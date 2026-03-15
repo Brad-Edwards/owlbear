@@ -150,11 +150,15 @@ static int set_syscall_regs(pid_t pid, uint64_t pc,
 
 static uint64_t read_result(pid_t pid)
 {
-	struct user_pt_regs r;
+	struct user_pt_regs r = {0};
 	struct iovec iov = { .iov_base = &r, .iov_len = sizeof(r) };
 
-	ptrace(PTRACE_GETREGSET, pid,
-	       (void *)(uintptr_t)NT_PRSTATUS, &iov);
+	if (ptrace(PTRACE_GETREGSET, pid,
+		   (void *)(uintptr_t)NT_PRSTATUS, &iov) < 0) {
+		fprintf(stderr, "[mprotect_inject] read_result failed: %s\n",
+			strerror(errno));
+		return (uint64_t)-1;
+	}
 	return r.regs[0];
 }
 
@@ -259,9 +263,60 @@ static const long CODE_WORD = (long)0x0000C30000002AB8L;
 #endif /* arch */
 
 /* -------------------------------------------------------------------------
- * Single-step execution
+ * Syscall execution
  * ----------------------------------------------------------------------- */
 
+#if defined(__aarch64__)
+/*
+ * PTRACE_SINGLESTEP over SVC #0 on kernel 6.17 ARM64 does not execute
+ * the syscall — the register file is unchanged after the step. Use
+ * PTRACE_SYSCALL enter/exit pair instead, which uses the kernel's
+ * syscall tracing infrastructure and reliably processes SVC on all
+ * ARM64 kernels.
+ */
+static int exec_syscall_wait(pid_t pid)
+{
+	int status;
+
+	/* Enter syscall */
+	if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) < 0) {
+		fprintf(stderr, "[mprotect_inject] PTRACE_SYSCALL (enter) "
+			"failed: %s\n", strerror(errno));
+		return -1;
+	}
+
+	if (waitpid(pid, &status, 0) < 0) {
+		fprintf(stderr, "[mprotect_inject] waitpid (enter) "
+			"failed: %s\n", strerror(errno));
+		return -1;
+	}
+	if (!WIFSTOPPED(status)) {
+		fprintf(stderr, "[mprotect_inject] Target not stopped at "
+			"syscall-enter (status=0x%x)\n", status);
+		return -1;
+	}
+
+	/* Exit syscall */
+	if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) < 0) {
+		fprintf(stderr, "[mprotect_inject] PTRACE_SYSCALL (exit) "
+			"failed: %s\n", strerror(errno));
+		return -1;
+	}
+
+	if (waitpid(pid, &status, 0) < 0) {
+		fprintf(stderr, "[mprotect_inject] waitpid (exit) "
+			"failed: %s\n", strerror(errno));
+		return -1;
+	}
+	if (!WIFSTOPPED(status)) {
+		fprintf(stderr, "[mprotect_inject] Target not stopped at "
+			"syscall-exit (status=0x%x)\n", status);
+		return -1;
+	}
+
+	return 0;
+}
+#elif defined(__x86_64__)
 static int single_step_wait(pid_t pid)
 {
 	if (ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL) < 0) {
@@ -291,6 +346,7 @@ static int single_step_wait(pid_t pid)
 		WIFSTOPPED(status) ? WSTOPSIG(status) : -1);
 	return -1;
 }
+#endif
 
 /* -------------------------------------------------------------------------
  * Main
@@ -391,14 +447,20 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if (single_step_wait(target_pid) < 0) {
+	if (
+#if defined(__aarch64__)
+	    exec_syscall_wait(target_pid)
+#else
+	    single_step_wait(target_pid)
+#endif
+	    < 0) {
 		restore_state(target_pid, &saved);
 		ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
 		return EXIT_FAILURE;
 	}
 
 	uint64_t mmap_addr = read_result(target_pid);
-	if ((int64_t)mmap_addr < 0) {
+	if ((int64_t)mmap_addr <= 0) {
 		fprintf(stderr, "[mprotect_inject] mmap failed in game "
 			"(returned 0x%lx)\n", (unsigned long)mmap_addr);
 		restore_state(target_pid, &saved);
@@ -441,7 +503,13 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if (single_step_wait(target_pid) < 0) {
+	if (
+#if defined(__aarch64__)
+	    exec_syscall_wait(target_pid)
+#else
+	    single_step_wait(target_pid)
+#endif
+	    < 0) {
 		restore_state(target_pid, &saved);
 		ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
 		return EXIT_FAILURE;

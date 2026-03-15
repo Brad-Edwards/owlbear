@@ -228,6 +228,8 @@ jobs:
             --output-s3-key-prefix "ci-output" \
             --parameters commands='[
               "set -euo pipefail",
+              "export DEBIAN_FRONTEND=noninteractive",
+              "apt-get install -y -qq libssl-dev 2>&1 | tail -3",
               "cd /home/ubuntu/owlbear",
               "chown -R ubuntu:ubuntu .",
               "echo === Git sync ===",

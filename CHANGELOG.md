@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-03-15
+
+### Fixed
+- ARM64 ptrace syscall injection: replaced `PTRACE_SINGLESTEP` with `PTRACE_SYSCALL` enter/exit pair for executing injected SVC instructions. `PTRACE_SINGLESTEP` over `SVC #0` on kernel 6.17 ARM64 does not execute the syscall — registers are unchanged after the step. x86_64 path unchanged.
+- `read_result()` in `mprotect_inject_via_ptrace.c`: added error check on `PTRACE_GETREGSET` return (previously returned uninitialized stack data on failure)
+- mmap return value check: reject 0 as failure (`<= 0` instead of `< 0`), since 0 means the syscall never ran
+- LD_PRELOAD detection race condition: `owl_check_preload_env()` now retries up to 3 times with 50ms backoff when `/proc/<pid>/environ` is unreadable. The exec tracepoint fires during `execve()` processing before the new process image is fully set up.
+
 ## [2.3.0] - 2026-03-15
 
 ### Added
@@ -22,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tests/test_integrity.c`: init test checks HMAC fields instead of CRC32
 - `scripts/verify.sh`: version bumped to v2.3.0
 - `README.md`: updated status (v2.3.0, 125 tests, 14 suites), HMAC-SHA256 in daemon description, removed CRC32 limitation
+- `deploy/terraform/modules/graviton-dev/userdata.sh`: added `libssl-dev` to build dependencies
+- `.github/workflows/ci.yml`: install `libssl-dev` on Graviton before build (OpenSSL headers required for HMAC-SHA256)
 
 ## [2.2.0] - 2026-03-15
 

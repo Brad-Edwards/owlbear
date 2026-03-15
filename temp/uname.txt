@@ -1,1 +1,0 @@
-Linux ip-172-31-15-228.us-east-2.compute.internal 6.1.163-186.299.amzn2023.aarch64 #1 SMP Tue Feb 24 16:35:14 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux

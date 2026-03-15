@@ -38,7 +38,9 @@ $(TARGET): $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
 
-# bpf_loader.c depends on skeleton headers from the ebpf build
+# bpf_loader.c includes generated skeleton headers that use overlength strings
+# and empty structs — relax pedantic warnings for this file only.
+bpf_loader.o: CFLAGS := $(filter-out -Wpedantic,$(CFLAGS)) -Wno-overlength-strings
 bpf_loader.o: bpf_loader.c ../ebpf/owlbear_lsm.skel.h ../ebpf/owlbear_trace.skel.h ../ebpf/owlbear_kprobe.skel.h
 
 clean:

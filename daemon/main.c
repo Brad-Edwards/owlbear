@@ -8,6 +8,7 @@
  *
  * Usage:
  *   owlbeard --target <pid> [--enforce] [--log <path>] [--sigs <path>]
+ *            [--verbose | --quiet]
  *   owlbeard --help
  */
 
@@ -38,6 +39,7 @@
 #include "clock_validator.h"
 #include "vdso_integrity.h"
 #include "sig_loader.h"
+#include "log.h"
 
 /* -------------------------------------------------------------------------
  * Configuration
@@ -47,6 +49,8 @@
 #define OWL_PERIODIC_INTERVAL_S 30
 #define OWL_WATCHDOG_INTERVAL_S 5
 #define OWL_EPOLL_TIMEOUT_MS    1000  /* 1 second for periodic timer checks */
+
+enum owl_log_level g_owl_log_level = OWL_LOG_INFO;
 
 struct daemon_config {
 	pid_t       target_pid;
@@ -77,11 +81,11 @@ static int install_signal_handlers(void)
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIGINT, &sa, NULL) < 0) {
-		perror("sigaction(SIGINT)");
+		OWL_ERR("sigaction(SIGINT): %s", strerror(errno));
 		return -1;
 	}
 	if (sigaction(SIGTERM, &sa, NULL) < 0) {
-		perror("sigaction(SIGTERM)");
+		OWL_ERR("sigaction(SIGTERM): %s", strerror(errno));
 		return -1;
 	}
 
@@ -256,12 +260,11 @@ static int open_device(const char *path)
 	int fd = open(path, O_RDONLY);
 
 	if (fd < 0) {
-		fprintf(stderr, "owlbeard: failed to open %s: %s\n",
-			path, strerror(errno));
+		OWL_ERR("failed to open %s: %s", path, strerror(errno));
 		if (errno == ENOENT)
-			fprintf(stderr, "  Is the owlbear kernel module loaded?\n");
+			OWL_ERR("  Is the owlbear kernel module loaded?");
 		else if (errno == EACCES)
-			fprintf(stderr, "  Try running as root.\n");
+			OWL_ERR("  Try running as root.");
 	}
 
 	return fd;
@@ -272,12 +275,11 @@ static int set_target_pid(int fd, pid_t pid)
 	__u32 p = (__u32)pid;
 
 	if (ioctl(fd, OWL_IOC_SET_TARGET, &p) < 0) {
-		fprintf(stderr, "owlbeard: failed to set target PID %d: %s\n",
-			pid, strerror(errno));
+		OWL_ERR("failed to set target PID %d: %s", pid, strerror(errno));
 		return -1;
 	}
 
-	printf("owlbeard: protecting PID %d\n", pid);
+	OWL_INFO("protecting PID %d", pid);
 	return 0;
 }
 
@@ -286,13 +288,11 @@ static int set_enforce_mode(int fd, bool enforce)
 	__u32 mode = enforce ? 1 : 0;
 
 	if (ioctl(fd, OWL_IOC_SET_MODE, &mode) < 0) {
-		fprintf(stderr, "owlbeard: failed to set enforce mode: %s\n",
-			strerror(errno));
+		OWL_ERR("failed to set enforce mode: %s", strerror(errno));
 		return -1;
 	}
 
-	printf("owlbeard: enforcement mode: %s\n",
-	       enforce ? "BLOCK" : "OBSERVE");
+	OWL_INFO("enforcement mode: %s", enforce ? "BLOCK" : "OBSERVE");
 	return 0;
 }
 
@@ -301,20 +301,19 @@ static int print_status(int fd)
 	struct owl_status status;
 
 	if (ioctl(fd, OWL_IOC_GET_STATUS, &status) < 0) {
-		fprintf(stderr, "owlbeard: failed to get status: %s\n",
-			strerror(errno));
+		OWL_ERR("failed to get status: %s", strerror(errno));
 		return -1;
 	}
 
-	printf("owlbeard: status:\n");
-	printf("  target_pid:    %u\n", status.target_pid);
-	printf("  enforce_mode:  %s\n", status.enforce_mode ? "block" : "observe");
-	printf("  events_total:  %u\n", status.events_generated);
-	printf("  events_dropped: %u\n", status.events_dropped);
-	printf("  kmod_version:  %u.%u.%u\n",
-	       (status.kmod_version >> 16) & 0xFF,
-	       (status.kmod_version >> 8) & 0xFF,
-	       status.kmod_version & 0xFF);
+	OWL_INFO("status:");
+	OWL_INFO("  target_pid:    %u", status.target_pid);
+	OWL_INFO("  enforce_mode:  %s", status.enforce_mode ? "block" : "observe");
+	OWL_INFO("  events_total:  %u", status.events_generated);
+	OWL_INFO("  events_dropped: %u", status.events_dropped);
+	OWL_INFO("  kmod_version:  %u.%u.%u",
+		 (status.kmod_version >> 16) & 0xFF,
+		 (status.kmod_version >> 8) & 0xFF,
+		 status.kmod_version & 0xFF);
 
 	return 0;
 }
@@ -363,7 +362,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 
 	epfd = epoll_create1(EPOLL_CLOEXEC);
 	if (epfd < 0) {
-		perror("owlbeard: epoll_create1");
+		OWL_ERR("epoll_create1: %s", strerror(errno));
 		return -1;
 	}
 
@@ -372,7 +371,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 	ev.events = EPOLLIN | EPOLLHUP | EPOLLERR;
 	ev.data.fd = dev_fd;
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, dev_fd, &ev) < 0) {
-		perror("owlbeard: epoll_ctl(dev_fd)");
+		OWL_ERR("epoll_ctl(dev_fd): %s", strerror(errno));
 		close(epfd);
 		return -1;
 	}
@@ -384,14 +383,13 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		ev.events = EPOLLIN;
 		ev.data.fd = bpf_fd;
 		if (epoll_ctl(epfd, EPOLL_CTL_ADD, bpf_fd, &ev) < 0) {
-			fprintf(stderr, "owlbeard: epoll_ctl(bpf_fd) failed: %s\n",
-				strerror(errno));
+			OWL_WARN("epoll_ctl(bpf_fd) failed: %s", strerror(errno));
 			/* Non-fatal: we can still poll BPF manually */
 		}
 	}
 
-	printf("owlbeard: listening for events (epoll, fds: dev=%d bpf=%d)...\n",
-	       dev_fd, bpf_fd);
+	OWL_INFO("listening for events (epoll, fds: dev=%d bpf=%d)...",
+		 dev_fd, bpf_fd);
 
 	while (g_running) {
 		int nfds = epoll_wait(epfd, events, 4, OWL_EPOLL_TIMEOUT_MS);
@@ -399,7 +397,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		if (nfds < 0) {
 			if (errno == EINTR)
 				continue;
-			perror("owlbeard: epoll_wait");
+			OWL_ERR("epoll_wait: %s", strerror(errno));
 			close(epfd);
 			return -1;
 		}
@@ -409,8 +407,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 			if (events[i].data.fd == dev_fd &&
 			    (events[i].events & (EPOLLHUP | EPOLLERR))) {
 				/* Device gone — module unloaded */
-				fprintf(stderr, "owlbeard: device closed "
-					"(module unloaded)\n");
+				OWL_WARN("device closed (module unloaded)");
 				epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
 				dev_fd = -1;
 				continue;
@@ -426,17 +423,15 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 						continue;
 					if (errno == EAGAIN)
 						continue;
-					fprintf(stderr, "owlbeard: device read error: %s "
-						"(module unloaded?)\n",
-						strerror(errno));
+					OWL_ERR("device read error: %s (module unloaded?)",
+					strerror(errno));
 					epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
 					dev_fd = -1;
 					continue;
 				}
 
 				if (n == 0) {
-					fprintf(stderr, "owlbeard: device closed "
-						"(module unloaded)\n");
+					OWL_WARN("device closed (module unloaded)");
 					epoll_ctl(epfd, EPOLL_CTL_DEL, dev_fd, NULL);
 					dev_fd = -1;
 					continue;
@@ -466,14 +461,14 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 			/* Signature scan */
 			int matches = owl_pipeline_scan(pipeline);
 			if (matches > 0)
-				printf("owlbeard: periodic scan: %d signature matches\n",
-				       matches);
+				OWL_INFO("periodic scan: %d signature matches",
+					 matches);
 
 			/* Integrity check */
 			if (integrity && integrity->baseline_set) {
 				int ic = owl_integrity_check(integrity);
 				if (ic == 1) {
-					printf("owlbeard: [ALERT] code integrity violation!\n");
+					OWL_WARN("[ALERT] code integrity violation!");
 
 					struct owlbear_event ie;
 					struct timespec ts;
@@ -494,7 +489,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 			if (vdso_integ && vdso_integ->baseline_set) {
 				int vc = owl_vdso_integrity_check(vdso_integ);
 				if (vc == 1) {
-					printf("owlbeard: [ALERT] vDSO tamper detected!\n");
+					OWL_WARN("[ALERT] vDSO tamper detected!");
 
 					struct owlbear_event ve;
 					struct timespec ts;
@@ -566,8 +561,8 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 			if (dbg_detect) {
 				int dbg_result = owl_debugger_detect_check(dbg_detect);
 				if (dbg_result & 0x01) {
-					printf("owlbeard: [ALERT] debugger attached (TracerPid=%d)!\n",
-					       dbg_detect->last_tracer);
+					OWL_WARN("[ALERT] debugger attached (TracerPid=%d)!",
+						 dbg_detect->last_tracer);
 
 					struct owlbear_event de;
 					struct timespec ts;
@@ -593,7 +588,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 			if (clock_val) {
 				int clk_result = owl_clock_validator_check(clock_val);
 				if (clk_result & 0x01) {
-					printf("owlbeard: [ALERT] clock drift detected!\n");
+					OWL_WARN("[ALERT] clock drift detected!");
 
 					struct owlbear_event ce;
 					struct timespec ts;
@@ -637,6 +632,8 @@ static void print_usage(const char *progname)
 		"  -l, --log <path>     Write events to log file\n"
 		"  -d, --device <path>  Device path (default: /dev/owlbear)\n"
 		"  -s, --sigs <path>    Signature file (default: %s)\n"
+		"  -v, --verbose        Verbose output (show debug messages)\n"
+		"  -q, --quiet          Quiet output (errors and warnings only)\n"
 		"  -h, --help           Show this help\n"
 		"\n"
 		"Example:\n"
@@ -652,6 +649,8 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 		{ "log",     required_argument, NULL, 'l' },
 		{ "device",  required_argument, NULL, 'd' },
 		{ "sigs",    required_argument, NULL, 's' },
+		{ "verbose", no_argument,       NULL, 'v' },
+		{ "quiet",   no_argument,       NULL, 'q' },
 		{ "help",    no_argument,       NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -666,13 +665,13 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 	cfg->device_path = OWL_DEVICE_PATH;
 	cfg->sigs_path = OWL_DEFAULT_SIGS_PATH;
 
-	while ((opt = getopt_long(argc, argv, "t:el:d:s:h", long_opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:el:d:s:vqh", long_opts, NULL)) != -1) {
 		switch (opt) {
 		case 't':
 			errno = 0;
 			pid_val = strtol(optarg, &endptr, 10);
 			if (errno != 0 || *endptr != '\0' || pid_val <= 0) {
-				fprintf(stderr, "owlbeard: invalid PID: %s\n", optarg);
+				OWL_ERR("invalid PID: %s", optarg);
 				return -1;
 			}
 			cfg->target_pid = (pid_t)pid_val;
@@ -689,6 +688,12 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 		case 's':
 			cfg->sigs_path = optarg;
 			break;
+		case 'v':
+			g_owl_log_level = OWL_LOG_DBG;
+			break;
+		case 'q':
+			g_owl_log_level = OWL_LOG_WARN;
+			break;
 		case 'h':
 			print_usage(argv[0]);
 			exit(0);
@@ -699,7 +704,7 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 	}
 
 	if (cfg->target_pid == 0) {
-		fprintf(stderr, "owlbeard: --target <pid> is required\n");
+		OWL_ERR("--target <pid> is required");
 		print_usage(argv[0]);
 		return -1;
 	}
@@ -796,12 +801,12 @@ int main(int argc, char *argv[])
 	if (cfg.log_path) {
 		log_file = fopen(cfg.log_path, "a");
 		if (!log_file) {
-			fprintf(stderr, "owlbeard: failed to open log %s: %s\n",
-				cfg.log_path, strerror(errno));
+			OWL_ERR("failed to open log %s: %s",
+			cfg.log_path, strerror(errno));
 			return EXIT_FAILURE;
 		}
 		setlinebuf(log_file);
-		printf("owlbeard: logging to %s\n", cfg.log_path);
+		OWL_INFO("logging to %s", cfg.log_path);
 	}
 
 	/* Setup policy engine */
@@ -811,11 +816,9 @@ int main(int argc, char *argv[])
 	owl_sig_db_init(&sig_db);
 	int nsigs = owl_sig_load_file(&sig_db, cfg.sigs_path);
 	if (nsigs >= 0) {
-		printf("owlbeard: loaded %d signatures from %s\n",
-		       nsigs, cfg.sigs_path);
+		OWL_INFO("loaded %d signatures from %s", nsigs, cfg.sigs_path);
 	} else {
-		fprintf(stderr, "owlbeard: failed to load signatures from %s\n",
-			cfg.sigs_path);
+		OWL_ERR("failed to load signatures from %s", cfg.sigs_path);
 		/* Non-fatal: scanner will just not match anything */
 	}
 
@@ -855,27 +858,27 @@ int main(int argc, char *argv[])
 	if (bpf) {
 		/* Populate BPF maps */
 		if (owl_bpf_protect_pid(bpf, (uint32_t)cfg.target_pid) < 0)
-			fprintf(stderr, "owlbeard: failed to set protected PID in BPF map\n");
+			OWL_ERR("failed to set protected PID in BPF map");
 
 		/* Whitelist the daemon itself */
 		if (owl_bpf_allow_pid(bpf, (uint32_t)getpid()) < 0)
-			fprintf(stderr, "owlbeard: failed to whitelist daemon in BPF map\n");
+			OWL_ERR("failed to whitelist daemon in BPF map");
 
 		/* Whitelist the game process */
 		if (owl_bpf_allow_pid(bpf, (uint32_t)cfg.target_pid) < 0)
-			fprintf(stderr, "owlbeard: failed to whitelist game in BPF map\n");
+			OWL_ERR("failed to whitelist game in BPF map");
 
-		printf("owlbeard: BPF: lsm=%s trace=%s kprobe=%s net=%s\n",
-		       owl_bpf_has_lsm(bpf) ? "yes" : "no",
-		       owl_bpf_has_trace(bpf) ? "yes" : "no",
-		       owl_bpf_has_kprobe(bpf) ? "yes" : "no",
-		       owl_bpf_has_net(bpf) ? "yes" : "no");
+		OWL_INFO("BPF: lsm=%s trace=%s kprobe=%s net=%s",
+			 owl_bpf_has_lsm(bpf) ? "yes" : "no",
+			 owl_bpf_has_trace(bpf) ? "yes" : "no",
+			 owl_bpf_has_kprobe(bpf) ? "yes" : "no",
+			 owl_bpf_has_net(bpf) ? "yes" : "no");
 	}
 
 	/* Initialize code integrity baseline */
 	owl_integrity_init_ctx(&integrity);
 	if (owl_integrity_baseline(&integrity, cfg.target_pid) < 0) {
-		fprintf(stderr, "owlbeard: integrity baseline failed (non-fatal)\n");
+		OWL_WARN("integrity baseline failed (non-fatal)");
 	}
 
 	/* Initialize self-protection */
@@ -890,21 +893,21 @@ int main(int argc, char *argv[])
 	/* Initialize vDSO integrity */
 	owl_vdso_integrity_init(&vdso_integ, cfg.target_pid);
 	if (owl_vdso_integrity_baseline(&vdso_integ, cfg.target_pid) < 0) {
-		fprintf(stderr, "owlbeard: vdso baseline failed (non-fatal)\n");
+		OWL_WARN("vdso baseline failed (non-fatal)");
 	}
 
-	printf("owlbeard: ready (pid=%d, target=%d, mode=%s)\n",
-	       getpid(), cfg.target_pid,
-	       cfg.enforce ? "enforce" : "observe");
+	OWL_INFO("ready (pid=%d, target=%d, mode=%s)",
+		 getpid(), cfg.target_pid,
+		 cfg.enforce ? "enforce" : "observe");
 
 	/* Run the event loop */
 	ret = event_loop(dev_fd, bpf, &pipeline, &integrity, &selfprot,
 			 &dbg_detect, &clock_val, &vdso_integ,
 			 log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
-	printf("owlbeard: shutting down (events=%u, blocks=%u, kills=%u, sigs=%u)\n",
-	       pipeline.events_processed, pipeline.actions_block,
-	       pipeline.actions_kill, pipeline.sig_matches);
+	OWL_INFO("shutting down (events=%u, blocks=%u, kills=%u, sigs=%u)",
+		 pipeline.events_processed, pipeline.actions_block,
+		 pipeline.actions_kill, pipeline.sig_matches);
 
 cleanup:
 	owl_ptree_destroy(&ptree);

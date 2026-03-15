@@ -9,6 +9,9 @@
 #include "test_harness.h"
 #include "hmac_sha256.h"
 #include "integrity.h"
+#include "log.h"
+
+enum owl_log_level g_owl_log_level = OWL_LOG_INFO;
 
 /* Helper: hex string to bytes */
 static void hex_to_bytes(const char *hex, uint8_t *out, size_t out_len)

@@ -17,6 +17,7 @@
 
 #include "self_protect.h"
 #include "owlbear_events.h"
+#include "log.h"
 
 int owl_selfprotect_init(struct owl_self_protect *sp, int dev_fd, int bpf_fd)
 {
@@ -31,11 +32,10 @@ int owl_selfprotect_init(struct owl_self_protect *sp, int dev_fd, int bpf_fd)
 
 	/* Block ptrace on this process */
 	if (prctl(PR_SET_DUMPABLE, 0) < 0) {
-		fprintf(stderr, "owlbeard: prctl(PR_SET_DUMPABLE, 0) failed: %s\n",
-			strerror(errno));
+		OWL_WARN("prctl(PR_SET_DUMPABLE, 0) failed: %s", strerror(errno));
 		/* Non-fatal */
 	} else {
-		printf("owlbeard: self-protection: ptrace blocked on daemon\n");
+		OWL_INFO("self-protection: ptrace blocked on daemon");
 	}
 
 	return 0;
@@ -66,17 +66,14 @@ int owl_selfprotect_watchdog(struct owl_self_protect *sp)
 	/* Check 1: module directory */
 	bool mod_present = owl_selfprotect_check_module();
 	if (!mod_present && sp->module_present) {
-		fprintf(stderr, "owlbeard: [ALERT] kernel module unloaded!\n");
-		fflush(stderr);
-		printf("owlbeard: [ALERT] kernel module unloaded!\n");
-		fflush(stdout);
+		OWL_WARN("[ALERT] kernel module unloaded!");
 		result |= 0x01;
 	}
 	sp->module_present = mod_present;
 
 	/* Check 2: ioctl still works */
 	if (mod_present && !owl_selfprotect_check_ioctl(sp->dev_fd)) {
-		fprintf(stderr, "owlbeard: [ALERT] kernel module not responding!\n");
+		OWL_WARN("[ALERT] kernel module not responding!");
 		result |= 0x02;
 	}
 
@@ -85,7 +82,7 @@ int owl_selfprotect_watchdog(struct owl_self_protect *sp)
 		/* Use fcntl F_GETFD to check if fd is still open */
 		if (fcntl(sp->bpf_rb_fd, F_GETFD) < 0) {
 			if (sp->bpf_attached) {
-				fprintf(stderr, "owlbeard: [ALERT] BPF programs detached!\n");
+				OWL_WARN("[ALERT] BPF programs detached!");
 				result |= 0x04;
 			}
 			sp->bpf_attached = false;

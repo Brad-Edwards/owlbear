@@ -28,7 +28,8 @@ TEST_BINS := test_events \
              test_hmac_sha256 \
              test_net_allowlist \
              test_clock_validator \
-             test_vdso_integrity
+             test_vdso_integrity \
+             test_log
 
 .PHONY: all unit integration clean
 
@@ -99,6 +100,9 @@ test_clock_validator: test_harness.o test_clock_validator.o $(DAEMON_DIR)/clock_
 
 test_vdso_integrity: test_harness.o test_vdso_integrity.o $(DAEMON_DIR)/vdso_integrity.o $(DAEMON_DIR)/hmac_sha256.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto
+
+test_log: test_harness.o test_log.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c

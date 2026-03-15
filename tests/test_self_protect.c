@@ -11,6 +11,9 @@
 
 #include "test_harness.h"
 #include "self_protect.h"
+#include "log.h"
+
+enum owl_log_level g_owl_log_level = OWL_LOG_INFO;
 
 /* -------------------------------------------------------------------------
  * Module presence check — runs on any system

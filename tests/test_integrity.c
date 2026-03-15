@@ -7,6 +7,9 @@
 
 #include "test_harness.h"
 #include "integrity.h"
+#include "log.h"
+
+enum owl_log_level g_owl_log_level = OWL_LOG_INFO;
 
 /* -------------------------------------------------------------------------
  * CRC32 tests

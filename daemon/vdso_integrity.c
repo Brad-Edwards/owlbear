@@ -16,6 +16,7 @@
 
 #include "vdso_integrity.h"
 #include "hmac_sha256.h"
+#include "log.h"
 
 /* -------------------------------------------------------------------------
  * Maps parsing — find [vdso] mapping (pure function)
@@ -191,10 +192,10 @@ int owl_vdso_integrity_baseline(struct owl_vdso_integrity *ctx, pid_t pid)
 	for (size_t i = 0; i < OWL_HMAC_SHA256_LEN; i++)
 		sprintf(hex + 2 * i, "%02x", ctx->baseline_hmac[i]);
 
-	printf("owlbeard: vdso baseline: start=0x%lx size=%lu hmac=%s\n",
-	       (unsigned long)ctx->vdso_start,
-	       (unsigned long)ctx->vdso_size,
-	       hex);
+	OWL_INFO("vdso baseline: start=0x%lx size=%lu hmac=%s",
+		 (unsigned long)ctx->vdso_start,
+		 (unsigned long)ctx->vdso_size,
+		 hex);
 
 	return 0;
 }

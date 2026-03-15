@@ -10,6 +10,9 @@
 
 #include "test_harness.h"
 #include "vdso_integrity.h"
+#include "log.h"
+
+enum owl_log_level g_owl_log_level = OWL_LOG_INFO;
 
 /* -------------------------------------------------------------------------
  * Pure function: owl_vdso_parse_mapping

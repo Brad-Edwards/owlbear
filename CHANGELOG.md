@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-03-15
+
+### Added
+- `daemon/log.h`: header-only logging macro system with 4 levels (ERR/WARN/INFO/DBG), runtime filtering via `g_owl_log_level`, compile-time DBG gate via `OWL_DEBUG`. ERR/WARN route to stderr, INFO/DBG to stdout. Mirrors kernel module `pr_info`/`pr_warn`/`pr_err` pattern.
+- `tests/test_log.c`: 7 unit tests — output routing, level filtering, prefix injection, format interpolation, compile-time DBG elimination
+- `--verbose`/`-v` and `--quiet`/`-q` CLI flags for daemon log level control
+
+### Changed
+- `daemon/main.c`: migrated ~35 printf/fprintf/perror call sites to OWL_ERR/OWL_WARN/OWL_INFO macros, added `g_owl_log_level` global and `--verbose`/`--quiet` flag parsing
+- `daemon/bpf_loader.c`: migrated 15 call sites to log macros, enhanced libbpf callback to respect `g_owl_log_level` for LIBBPF_DEBUG
+- `daemon/self_protect.c`: migrated 5 call sites to log macros
+- `daemon/integrity.c`: migrated 1 call site to OWL_INFO
+- `daemon/vdso_integrity.c`: migrated 1 call site to OWL_INFO
+- `tests/Makefile`: added `test_log` to TEST_BINS (18 suites total)
+
+### Fixed
+- `daemon/self_protect.c`: dual-logging bug — `owl_selfprotect_watchdog()` wrote "[ALERT] kernel module unloaded!" to both stderr and stdout with explicit flushes. Now single OWL_WARN call to stderr only.
+- Alert messages (`[ALERT] ...`) that were incorrectly routed to stdout now go to stderr via OWL_WARN
+
 ## [2.5.0] - 2026-03-15
 
 ### Added

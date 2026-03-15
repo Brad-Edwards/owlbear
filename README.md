@@ -1,99 +1,95 @@
 # Owlbear
 
-ARM64 kernel-mode anti-cheat for Linux. Hybrid architecture: kernel module for ARM64 hardware checks (system registers, debug registers, PAC enable state) + eBPF for process/memory monitoring. Userspace daemon consumes events from both, runs signature scans, ships telemetry to AWS.
+Anti-cheat and EDR prototype. ARM64 Linux, kernel module + eBPF + userspace daemon. Built to learn how kernel-level security monitoring works by building one.
 
-## Architecture
+Not production software.
 
-```
-                              catalyst-dev (AWS)
-                        +--------------------------+
-                        |  API Gateway             |
-                        |    |                     |
-  Graviton c7g.large    |  Lambda (handler.py)     |
- +------------------+   |    |                     |
- | Game Process     |   |  DynamoDB (events)       |
- |   | heartbeat    |   |    |                     |
- |   v              |   |  S3 (artifacts)          |
- | Daemon ----------+-->|                          |
- |   |       HTTPS  |   +--------------------------+
- |   |              |
- |   +-- /dev/owlbear ------+
- |   |                      |
- |   +-- BPF ringbuf -------+
- |                          |
- | Kernel Module      eBPF  |
- | (ARM64 HW checks) (LSM) |
- +------------------+-------+
-```
+## What's here
 
-## Detection Matrix
+Runs on Graviton3 (c7g.large), Ubuntu 24.04, kernel 6.17.
 
-| Technique | Detection | Component | Status |
-|-----------|-----------|-----------|--------|
-| `process_vm_readv` | Kprobe + BPF LSM + syscall tracepoint | Kernel + eBPF | Done |
-| `/proc/pid/mem` | Kprobe + BPF LSM `file_open` | Kernel + eBPF | Done |
-| `ptrace` attach | Kprobe + BPF LSM `ptrace_access_check` (-EPERM) | Kernel + eBPF | Done |
-| PROT_EXEC mmap | Kprobe + BPF LSM `mmap_file` | Kernel + eBPF | Done |
-| Kernel module load | Kprobe + BPF kprobe `do_init_module` | Kernel + eBPF | Done |
-| `LD_PRELOAD` hook | Function pointer integrity check | Game + Daemon | Done |
-| HW debug registers | ARM64 DBGBCR/DBGBVR 0-5, DBGWCR/DBGWVR 0-3 scan | Kernel | Done |
-| System register tamper | SCTLR_EL1/TCR_EL1/MAIR_EL1/MDSCR_EL1 baseline + periodic verify | Kernel | Done |
-| WXN disabled | SCTLR_EL1 bit 19 monitoring | Kernel | Done |
-| PAC disabled | SCTLR_EL1.EnIA monitoring | Kernel | Done |
-| VBAR_EL1 redirect | Vector table base comparison | Kernel | Done |
-| Unknown kernel modules | Module list walk post-init | Kernel | Done |
-| Cheat binary in memory | Byte-pattern signature scan (hex + wildcards) | Daemon | Done |
-| Policy-based response | Event-type + severity → action mapping | Daemon | Done |
-| Heartbeat anomalies | Frame count freeze/rewind + timeout detection | Daemon | Done |
-| Code modification | `.text` section hash | Daemon | Planned |
+- **kernel/** - loadable module. Kprobes on ptrace, /proc/pid/mem, process_vm_readv/writev, mmap, module load/unload. ARM64 system register monitoring. Chardev for event delivery.
+- **ebpf/** - BPF LSM hooks returning -EPERM (ptrace_access_check, file_open, file_mprotect). Tracepoints. Kprobe on do_init_module. Ring buffer to userspace.
+- **daemon/** - epoll on chardev + BPF ring buffer. Policy engine. Signature scanner. CRC32 code integrity. Self-protection watchdog.
+- **game/** - ncurses test target. Mutable state, function pointers, exported address.
+- **cheats/** - 8 attack programs: process_vm_readv, /proc/pid/mem, ptrace read, ptrace write, process_vm_writev, LD_PRELOAD, mprotect injection, debug registers.
+- **platform/** - Lambda + API Gateway + DynamoDB telemetry receiver.
+- **scripts/verify.sh** - E2E test. Baseline (cheats succeed) vs protected (cheats blocked). Machine-generated results.
 
-## Structure
+## Status
 
-```
-include/        Shared event header (kernel/eBPF/daemon contract)
-kernel/         Loadable kernel module (C, Kbuild)
-ebpf/           eBPF programs (C, libbpf CO-RE)
-daemon/         Userspace daemon (C)
-game/           Test game (C, ncurses)
-cheats/         Test cheat programs (C)
-platform/       Telemetry receiver (Python, Lambda + DynamoDB)
-signatures/     Cheat signature database
-deploy/         Terraform (catalyst-dev)
-scripts/        Build, provisioning, demo, E2E verification
-research/       Technical research (9 documents)
-tests/          Unit and integration tests (57 tests, 5 suites)
-```
+v1.0.0. 95 unit tests, 10 suites. 30/31 E2E pass on Graviton3. eBPF LSM returns EPERM on ptrace, /proc/pid/mem, process_vm_writev. Module can't be unloaded while daemon runs.
 
-## Why Hybrid
+Prototype limitations: linear signature scan, CRC32 not cryptographic, no fleet management, no anti-debug beyond prctl.
 
-eBPF cannot access ARM64 system registers (`SCTLR_EL1`, `MDSCR_EL1`), debug registers (`DBGBCR`/`DBGBVR`), or PAC enable state. A kernel module can. eBPF provides safe, portable, verifier-checked monitoring via LSM hooks and tracepoints. The kernel module handles hardware-specific integrity checks.
+## Getting started
 
-## Building
+### Existing instance
+
+Pre-provisioned Graviton3 in us-east-2 (catalyst-dev). Already built.
 
 ```bash
-sudo ./scripts/setup-dev.sh    # Install deps (detects arch)
-make all                       # Build everything
-make kernel                    # Kernel module
-make test                      # Unit tests (57 across 5 suites)
+./scripts/connect-graviton.sh       # SSM session
+
+# On the instance:
+cd ~/owlbear
+sudo scripts/verify.sh              # E2E, ~2 min
 ```
 
-Cross-compile from x86_64:
+Interactive:
+
 ```bash
-make all CROSS_COMPILE=aarch64-linux-gnu- CC=aarch64-linux-gnu-gcc
+# T1: game
+./game/owlbear-game
+
+# T2: protection
+sudo insmod kernel/owlbear.ko target_pid=$(pidof owlbear-game)
+sudo ./daemon/owlbeard --target $(pidof owlbear-game) --enforce
+
+# T3: cheats (get blocked)
+./cheats/ptrace_writer.bin           # EPERM
+./cheats/proc_mem_reader.bin         # EPERM
+./cheats/mem_reader.bin              # detected
 ```
 
-## ARM64 Features
+### New instance
 
-| Feature | ARMv8 | Usage |
-|---------|-------|-------|
-| System Registers | Base | MMU/cache/WXN tamper detection |
-| Debug Registers | Base | HW breakpoint detection on game code |
-| PAC | v8.3+ | SCTLR_EL1.EnIA disable detection |
-| BTI | v8.5+ | Branch target verification |
-| MTE | v8.5+ | Documented only (requires HW) |
+```bash
+cd deploy/terraform/environments/dev
+terraform init && terraform apply
+```
 
-Target: c7g.large (Graviton3, PAC-capable).
+Userdata installs deps, clones, builds. ~5 min.
+
+### Local ARM64
+
+```bash
+./scripts/setup-dev.sh
+make -C ebpf
+make all
+make test
+sudo scripts/verify.sh
+```
+
+## What you can learn
+
+- Kernel kprobes intercepting syscalls and internal functions
+- eBPF LSM returning -EPERM from BPF programs
+- BPF CO-RE compilation, skeleton loading, attachment
+- Chardev + ring buffer + epoll event delivery
+- ARM64 system register monitoring (SCTLR_EL1, MDSCR_EL1, VBAR_EL1)
+- PAC and debug register scanning on Graviton3
+- Why anti-cheat and EDR use the same kernel infrastructure
+- Why eBPF LSM is replacing custom kernel drivers
+
+## Anti-cheat vs EDR
+
+Same plumbing. Kprobes + eBPF LSM is how CrowdStrike, SentinelOne, and Cilium Tetragon work. Anti-cheat protects one process from everything else. EDR protects the system from specific threats. This prototype sits in the overlap.
+
+## Docs
+
+[GitHub Pages site](https://brad-edwards.github.io/owlbear/)
 
 ## License
 
-See [LICENSE](LICENSE).
+[LICENSE](LICENSE)

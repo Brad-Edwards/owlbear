@@ -10,7 +10,7 @@ Runs on Graviton3 (c7g.large), Ubuntu 24.04, kernel 6.17.
 
 - **kernel/** - loadable module. Kprobes on ptrace, /proc/pid/mem, process_vm_readv/writev, mmap, module load/unload. ARM64 system register monitoring. Chardev for event delivery.
 - **ebpf/** - BPF LSM hooks returning -EPERM (ptrace_access_check, file_open for /proc/pid/mem + /dev/mem + /dev/kmem, file_mprotect). Tracepoints. Kprobe on do_init_module. Ring buffer to userspace.
-- **daemon/** - epoll on chardev + BPF ring buffer. Policy engine. Signature scanner. CRC32 code integrity. Self-protection watchdog. TracerPid debugger detection. LD_PRELOAD environ scanning. Process ancestry tree for correlation.
+- **daemon/** - epoll on chardev + BPF ring buffer. Policy engine. Signature scanner. HMAC-SHA256 code integrity. Self-protection watchdog. TracerPid debugger detection. LD_PRELOAD environ scanning. Process ancestry tree for correlation.
 - **game/** - ncurses test target. Mutable state, function pointers, exported address.
 - **cheats/** - 9 attack programs: process_vm_readv, /proc/pid/mem, /dev/mem, ptrace read, ptrace write, process_vm_writev, LD_PRELOAD, mprotect injection, debug registers.
 - **platform/** - Lambda + API Gateway + DynamoDB telemetry receiver.
@@ -18,9 +18,9 @@ Runs on Graviton3 (c7g.large), Ubuntu 24.04, kernel 6.17.
 
 ## Status
 
-v2.2.0. 115 unit tests, 13 suites. eBPF LSM returns EPERM on ptrace, /proc/pid/mem, /dev/mem, /dev/kmem, process_vm_writev. Module can't be unloaded while daemon runs. TracerPid polling detects debuggers attached before daemon start. LD_PRELOAD detection on exec. Process tree tracks ancestry for correlation engine.
+v2.3.0. 125 unit tests, 14 suites. eBPF LSM returns EPERM on ptrace, /proc/pid/mem, /dev/mem, /dev/kmem, process_vm_writev. Module can't be unloaded while daemon runs. TracerPid polling detects debuggers attached before daemon start. LD_PRELOAD detection on exec. Process tree tracks ancestry for correlation engine.
 
-Prototype limitations: linear signature scan, CRC32 not cryptographic, no fleet management.
+Prototype limitations: linear signature scan, no fleet management.
 
 ## Getting started
 

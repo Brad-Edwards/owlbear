@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-15
+
+### Added
+- **WP2: HMAC-SHA256 code integrity** (`daemon/hmac_sha256.c`): replaces CRC32 with HMAC-SHA256 using per-session 256-bit random key from `/dev/urandom`. Uses OpenSSL one-shot `HMAC()` (not deprecated `HMAC_CTX_*`). Graviton3 ARMv8.4 SHA extensions accelerate computation.
+- `daemon/hmac_sha256.h`: public API (`owl_hmac_sha256`, `owl_hmac_generate_key`)
+- `tests/test_hmac_sha256.c`: 10 unit tests (TDD) — RFC 4231 known-answer vectors, empty/large input, key change, null inputs, key generation, integrity baseline+check, violation detection
+- Buffer-based integrity functions (`owl_integrity_baseline_buffer`, `owl_integrity_check_buffer`) for testable verification without /proc I/O
+- `scripts/verify.sh`: HMAC-SHA256 baseline assertion in protected phase, ld_preload_hook baseline assertion
+
+### Changed
+- `daemon/integrity.h`: `baseline_crc` replaced with `baseline_hmac[32]` + `hmac_key[32]` in `struct owl_integrity`
+- `daemon/integrity.c`: baseline and check functions use HMAC-SHA256 via buffer variants; CRC32 retained for heartbeat `state_hash`
+- `daemon/Makefile`: added `hmac_sha256.c`, linked `-lssl -lcrypto`
+- `tests/Makefile`: added `test_hmac_sha256` suite, updated `test_integrity` linking with OpenSSL
+- `tests/test_integrity.c`: init test checks HMAC fields instead of CRC32
+- `scripts/verify.sh`: version bumped to v2.3.0
+- `README.md`: updated status (v2.3.0, 125 tests, 14 suites), HMAC-SHA256 in daemon description, removed CRC32 limitation
+
 ## [2.2.0] - 2026-03-15
 
 ### Added

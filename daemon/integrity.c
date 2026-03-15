@@ -2,7 +2,8 @@
 /*
  * integrity.c - Userspace code integrity verification
  *
- * CRC32 hash of game .text segment for runtime code modification detection.
+ * HMAC-SHA256 of game .text segment for runtime code modification detection.
+ * CRC32 retained for heartbeat state_hash.
  */
 
 #include <errno.h>
@@ -13,6 +14,7 @@
 #include <unistd.h>
 
 #include "integrity.h"
+#include "hmac_sha256.h"
 
 /* -------------------------------------------------------------------------
  * CRC32 — standard polynomial 0xEDB88320 (reflected)
@@ -190,14 +192,20 @@ int owl_integrity_baseline(struct owl_integrity *ctx, pid_t pid)
 		return -1;
 	}
 
-	ctx->baseline_crc = owl_crc32(buf, ctx->text_size);
-	ctx->baseline_set = true;
+	if (owl_integrity_baseline_buffer(ctx, buf, ctx->text_size) < 0) {
+		free(buf);
+		return -1;
+	}
 	free(buf);
 
-	printf("owlbeard: integrity baseline: text=0x%lx size=%lu crc32=0x%08x\n",
+	char hex[OWL_HMAC_SHA256_LEN * 2 + 1];
+	for (size_t i = 0; i < OWL_HMAC_SHA256_LEN; i++)
+		sprintf(hex + 2 * i, "%02x", ctx->baseline_hmac[i]);
+
+	printf("owlbeard: integrity baseline: text=0x%lx size=%lu hmac=%s\n",
 	       (unsigned long)ctx->text_start,
 	       (unsigned long)ctx->text_size,
-	       ctx->baseline_crc);
+	       hex);
 
 	return 0;
 }
@@ -217,10 +225,46 @@ int owl_integrity_check(const struct owl_integrity *ctx)
 		return -1;
 	}
 
-	uint32_t current_crc = owl_crc32(buf, ctx->text_size);
+	int result = owl_integrity_check_buffer(ctx, buf, ctx->text_size);
 	free(buf);
 
-	if (current_crc != ctx->baseline_crc)
+	return result;
+}
+
+/* -------------------------------------------------------------------------
+ * Buffer-based integrity functions (testable without /proc I/O)
+ * ----------------------------------------------------------------------- */
+
+int owl_integrity_baseline_buffer(struct owl_integrity *ctx,
+				  const uint8_t *buf, size_t len)
+{
+	if (!ctx || !buf)
+		return -1;
+
+	if (owl_hmac_generate_key(ctx->hmac_key, OWL_HMAC_SHA256_LEN) < 0)
+		return -1;
+
+	if (owl_hmac_sha256(ctx->hmac_key, OWL_HMAC_SHA256_LEN,
+			    buf, len, ctx->baseline_hmac) < 0)
+		return -1;
+
+	ctx->baseline_set = true;
+	return 0;
+}
+
+int owl_integrity_check_buffer(const struct owl_integrity *ctx,
+			       const uint8_t *buf, size_t len)
+{
+	if (!ctx || !buf || !ctx->baseline_set)
+		return -1;
+
+	uint8_t current[OWL_HMAC_SHA256_LEN];
+
+	if (owl_hmac_sha256(ctx->hmac_key, OWL_HMAC_SHA256_LEN,
+			    buf, len, current) < 0)
+		return -1;
+
+	if (memcmp(current, ctx->baseline_hmac, OWL_HMAC_SHA256_LEN) != 0)
 		return 1;  /* Integrity violation */
 
 	return 0;

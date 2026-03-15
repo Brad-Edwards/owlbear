@@ -24,7 +24,8 @@ TEST_BINS := test_events \
              test_self_protect \
              test_debugger_detect \
              test_preload_detect \
-             test_process_tree
+             test_process_tree \
+             test_hmac_sha256
 
 .PHONY: all unit integration clean
 
@@ -69,8 +70,8 @@ test_sig_loader: test_harness.o test_sig_loader.o $(DAEMON_DIR)/sig_loader.o $(D
 test_event_pipeline: test_harness.o test_event_pipeline.o $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+test_integrity: test_harness.o test_integrity.o $(DAEMON_DIR)/integrity.o $(DAEMON_DIR)/hmac_sha256.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto
 
 test_self_protect: test_harness.o test_self_protect.o $(DAEMON_DIR)/self_protect.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -83,6 +84,9 @@ test_preload_detect: test_harness.o test_preload_detect.o $(DAEMON_DIR)/preload_
 
 test_process_tree: test_harness.o test_process_tree.o $(DAEMON_DIR)/process_tree.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_hmac_sha256: test_harness.o test_hmac_sha256.o $(DAEMON_DIR)/hmac_sha256.o $(DAEMON_DIR)/integrity.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -lssl -lcrypto
 
 # Daemon objects needed by tests
 $(DAEMON_DIR)/%.o: $(DAEMON_DIR)/%.c
@@ -103,7 +107,7 @@ clean:
 	$(RM) $(TEST_BINS) *.o *.d
 	$(RM) $(DAEMON_DIR)/policy.o $(DAEMON_DIR)/scanner.o $(DAEMON_DIR)/heartbeat.o
 	$(RM) $(DAEMON_DIR)/bpf_event_convert.o $(DAEMON_DIR)/sig_loader.o
-	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o
+	$(RM) $(DAEMON_DIR)/event_pipeline.o $(DAEMON_DIR)/integrity.o $(DAEMON_DIR)/hmac_sha256.o
 	$(RM) $(DAEMON_DIR)/self_protect.o $(DAEMON_DIR)/debugger_detect.o $(DAEMON_DIR)/preload_detect.o $(DAEMON_DIR)/process_tree.o
 	$(RM) $(DAEMON_DIR)/*.d
 

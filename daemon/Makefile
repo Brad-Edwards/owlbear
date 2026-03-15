@@ -12,7 +12,7 @@ CFLAGS   := -std=c11 -Wall -Wextra -Werror \
             -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 \
             $(INCLUDES) $(CFLAGS_EXTRA) \
             -I../ebpf
-LDFLAGS  := -lpthread -lcurl -lbpf -lelf -lz
+LDFLAGS  := -lpthread -lcurl -lbpf -lelf -lz -lssl -lcrypto
 DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 
 # Source files
@@ -22,6 +22,7 @@ SRCS     := main.c \
             process_tree.c \
             sig_loader.c \
             integrity.c \
+            hmac_sha256.c \
             self_protect.c \
             debugger_detect.c \
             preload_detect.c \

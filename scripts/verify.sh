@@ -297,7 +297,7 @@ preflight() {
         | grep -o '"accountId" *: *"[^"]*"' | cut -d'"' -f4 || echo "local")
 
     cat > "${OUT_DIR}/summary.txt" <<HEADER
-# Owlbear E2E Verification Report (v2.2.0)
+# Owlbear E2E Verification Report (v2.3.0)
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Host: $(uname -n)
 # Kernel: $(uname -r)
@@ -537,6 +537,18 @@ phase_baseline() {
         assert_skip "baseline/dev_mem_reader" "/dev/mem does not exist"
     else
         assert_fail "baseline/dev_mem_reader should succeed or skip without module" "exit_code=${rc}"
+    fi
+
+    # --- ld_preload_hook (baseline) ---
+    run_cheat_captured "${phase_dir}" "ld_preload_hook" \
+        "${cheats_dir}/ld_preload_hook.bin" \
+        "${PROJECT_DIR}/game/owlbear-game" "--no-curses"
+
+    rc=$(cat "${phase_dir}/ld_preload_hook/exit_code")
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 124 ]; then
+        assert_pass "baseline/ld_preload_hook runs without module (code=${rc})"
+    else
+        assert_fail "baseline/ld_preload_hook should succeed without module" "exit_code=${rc}"
     fi
 
     capture_dmesg > "${phase_dir}/dmesg_after.txt"
@@ -855,6 +867,15 @@ phase_protected() {
         assert_pass "protected/code integrity baseline captured"
     fi
 
+    # Check integrity baseline uses HMAC-SHA256 (not CRC32)
+    if [ -f "${phase_dir}/daemon_stdout.log" ] && \
+       grep -q "hmac=" "${phase_dir}/daemon_stdout.log" 2>/dev/null; then
+        assert_pass "protected/code integrity uses HMAC-SHA256"
+    elif [ -f "${phase_dir}/daemon_stdout.log" ] && \
+       grep -q "crc32=" "${phase_dir}/daemon_stdout.log" 2>/dev/null; then
+        assert_fail "protected/code integrity still uses CRC32 (should be HMAC-SHA256)"
+    fi
+
     stop_daemon
 
     # Unload module
@@ -980,7 +1001,7 @@ FOOTER
 main() {
     echo ""
     echo -e "${BOLD}================================================${NC}"
-    echo -e "${BOLD}  Owlbear E2E Verification (v2.2.0)${NC}"
+    echo -e "${BOLD}  Owlbear E2E Verification (v2.3.0)${NC}"
     echo -e "${BOLD}  Evidence Package Builder${NC}"
     echo -e "${BOLD}================================================${NC}"
     echo ""

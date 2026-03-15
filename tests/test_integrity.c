@@ -88,11 +88,14 @@ TEST(parse_text_segment_null_input) {
 TEST(integrity_init_clears_state) {
 	struct owl_integrity ctx;
 	ctx.baseline_set = true;
-	ctx.baseline_crc = 0xDEADBEEF;
+	memset(ctx.baseline_hmac, 0xFF, sizeof(ctx.baseline_hmac));
+	memset(ctx.hmac_key, 0xFF, sizeof(ctx.hmac_key));
 
 	owl_integrity_init_ctx(&ctx);
 	ASSERT_EQ(ctx.baseline_set, false);
-	ASSERT_EQ(ctx.baseline_crc, 0);
+	ASSERT_EQ(ctx.baseline_hmac[0], 0);
+	ASSERT_EQ(ctx.baseline_hmac[31], 0);
+	ASSERT_EQ(ctx.hmac_key[0], 0);
 	ASSERT_EQ(ctx.target_pid, 0);
 }
 

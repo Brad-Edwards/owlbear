@@ -23,6 +23,17 @@ HEARTBEATS_TABLE = os.environ.get("HEARTBEATS_TABLE", "owlbear-heartbeats")
 API_KEY = os.environ.get("API_KEY", "dev-key-change-in-prod")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 
+# Heartbeat response constants
+OWL_ACTION_CONTINUE = 0
+OWL_SIG_VERSION = 1
+
+# Query limits
+DEFAULT_QUERY_LIMIT = 100
+MAX_QUERY_LIMIT = 500
+
+# TTL for heartbeat records (seconds)
+HEARTBEAT_TTL_S = 3600
+
 # Lazy init — allows tests to mock before first use
 _dynamodb = None
 
@@ -117,15 +128,13 @@ def handle_post_heartbeat(event):
     item = _float_to_decimal(body)
     item["instance_id"] = instance_id
     item["received_at"] = int(time.time())
-    # TTL: expire after 1 hour
-    item["ttl"] = int(time.time()) + 3600
+    item["ttl"] = int(time.time()) + HEARTBEAT_TTL_S
 
     table.put_item(Item=item)
 
-    # Response: continue monitoring, no sig update
     response_body = {
-        "action": 0,       # OWL_ACTION_CONTINUE
-        "sig_version": 1,  # Current signature DB version
+        "action": OWL_ACTION_CONTINUE,
+        "sig_version": OWL_SIG_VERSION,
     }
 
     return _response(200, response_body)
@@ -135,7 +144,11 @@ def handle_get_events(event):
     """Query recent events for the dashboard."""
     params = event.get("queryStringParameters", {}) or {}
     session_id = params.get("session_id", None)
-    limit = min(int(params.get("limit", "100")), 500)
+    try:
+        limit = min(int(params.get("limit", str(DEFAULT_QUERY_LIMIT))),
+                    MAX_QUERY_LIMIT)
+    except (ValueError, TypeError):
+        limit = DEFAULT_QUERY_LIMIT
 
     table = _get_dynamodb().Table(EVENTS_TABLE)
 

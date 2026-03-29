@@ -41,6 +41,23 @@
 #include "sig_loader.h"
 #include "log.h"
 
+/* Initialize a daemon-generated event with timestamp and common fields */
+static inline void init_daemon_event(struct owlbear_event *ev,
+				     uint32_t type, uint32_t severity,
+				     uint32_t target_pid)
+{
+	struct timespec ts;
+
+	memset(ev, 0, sizeof(*ev));
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	ev->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
+			   (uint64_t)ts.tv_nsec;
+	ev->event_type = type;
+	ev->severity = severity;
+	ev->source = OWL_SRC_DAEMON;
+	ev->target_pid = target_pid;
+}
+
 /* -------------------------------------------------------------------------
  * Configuration
  * ----------------------------------------------------------------------- */
@@ -285,7 +302,7 @@ static int set_target_pid(int fd, pid_t pid)
 
 static int set_enforce_mode(int fd, bool enforce)
 {
-	__u32 mode = enforce ? 1 : 0;
+	__u32 mode = enforce;
 
 	if (ioctl(fd, OWL_IOC_SET_MODE, &mode) < 0) {
 		OWL_ERR("failed to set enforce mode: %s", strerror(errno));
@@ -471,16 +488,10 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					OWL_WARN("[ALERT] code integrity violation!");
 
 					struct owlbear_event ie;
-					struct timespec ts;
-					memset(&ie, 0, sizeof(ie));
-					clock_gettime(CLOCK_MONOTONIC, &ts);
-					ie.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-							  (uint64_t)ts.tv_nsec;
-					ie.event_type = OWL_EVENT_CODE_INTEGRITY_FAIL;
-					ie.severity = OWL_SEV_CRITICAL;
-					ie.source = OWL_SRC_DAEMON;
+					init_daemon_event(&ie, OWL_EVENT_CODE_INTEGRITY_FAIL,
+							  OWL_SEV_CRITICAL,
+							  (uint32_t)pipeline->target_pid);
 					ie.pid = (uint32_t)pipeline->target_pid;
-					ie.target_pid = (uint32_t)pipeline->target_pid;
 					owl_pipeline_process(pipeline, &ie);
 				}
 			}
@@ -492,15 +503,9 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					OWL_WARN("[ALERT] vDSO tamper detected!");
 
 					struct owlbear_event ve;
-					struct timespec ts;
-					memset(&ve, 0, sizeof(ve));
-					clock_gettime(CLOCK_MONOTONIC, &ts);
-					ve.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-							  (uint64_t)ts.tv_nsec;
-					ve.event_type = OWL_EVENT_VDSO_TAMPER;
-					ve.severity = OWL_SEV_CRITICAL;
-					ve.source = OWL_SRC_DAEMON;
-					ve.target_pid = (uint32_t)pipeline->target_pid;
+					init_daemon_event(&ve, OWL_EVENT_VDSO_TAMPER,
+							  OWL_SEV_CRITICAL,
+							  (uint32_t)pipeline->target_pid);
 					snprintf(ve.payload.arm64.description,
 						 sizeof(ve.payload.arm64.description),
 						 "vDSO HMAC mismatch");
@@ -519,18 +524,11 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 
 			int sp_result = owl_selfprotect_watchdog(selfprot);
 
-			if (sp_result & 0x01) {
-				/* Module unloaded */
+			if (sp_result & OWL_SELFPROT_MODULE_GONE) {
 				struct owlbear_event me;
-				struct timespec ts;
-				memset(&me, 0, sizeof(me));
-				clock_gettime(CLOCK_MONOTONIC, &ts);
-				me.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-						  (uint64_t)ts.tv_nsec;
-				me.event_type = OWL_EVENT_MODULE_UNKNOWN;
-				me.severity = OWL_SEV_CRITICAL;
-				me.source = OWL_SRC_DAEMON;
-				me.target_pid = (uint32_t)pipeline->target_pid;
+				init_daemon_event(&me, OWL_EVENT_MODULE_UNKNOWN,
+						  OWL_SEV_CRITICAL,
+						  (uint32_t)pipeline->target_pid);
 				strncpy(me.payload.module.name, "owlbear",
 					sizeof(me.payload.module.name) - 1);
 
@@ -539,18 +537,11 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					print_event(&me, log_file);
 			}
 
-			if (sp_result & 0x04) {
-				/* BPF detached */
+			if (sp_result & OWL_SELFPROT_BPF_DETACHED) {
 				struct owlbear_event be;
-				struct timespec ts;
-				memset(&be, 0, sizeof(be));
-				clock_gettime(CLOCK_MONOTONIC, &ts);
-				be.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-						  (uint64_t)ts.tv_nsec;
-				be.event_type = OWL_EVENT_EBPF_DETACHED;
-				be.severity = OWL_SEV_CRITICAL;
-				be.source = OWL_SRC_DAEMON;
-				be.target_pid = (uint32_t)pipeline->target_pid;
+				init_daemon_event(&be, OWL_EVENT_EBPF_DETACHED,
+						  OWL_SEV_CRITICAL,
+						  (uint32_t)pipeline->target_pid);
 
 				print_event(&be, stdout);
 				if (log_file)
@@ -565,16 +556,10 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 						 dbg_detect->last_tracer);
 
 					struct owlbear_event de;
-					struct timespec ts;
-					memset(&de, 0, sizeof(de));
-					clock_gettime(CLOCK_MONOTONIC, &ts);
-					de.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-							  (uint64_t)ts.tv_nsec;
-					de.event_type = OWL_EVENT_PTRACE_ATTEMPT;
-					de.severity = OWL_SEV_CRITICAL;
-					de.source = OWL_SRC_DAEMON;
+					init_daemon_event(&de, OWL_EVENT_PTRACE_ATTEMPT,
+							  OWL_SEV_CRITICAL,
+							  (uint32_t)pipeline->target_pid);
 					de.pid = (uint32_t)dbg_detect->last_tracer;
-					de.target_pid = (uint32_t)pipeline->target_pid;
 					de.payload.memory.caller_pid = (uint32_t)dbg_detect->last_tracer;
 
 					print_event(&de, stdout);
@@ -591,15 +576,9 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 					OWL_WARN("[ALERT] clock drift detected!");
 
 					struct owlbear_event ce;
-					struct timespec ts;
-					memset(&ce, 0, sizeof(ce));
-					clock_gettime(CLOCK_MONOTONIC, &ts);
-					ce.timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL +
-							  (uint64_t)ts.tv_nsec;
-					ce.event_type = OWL_EVENT_CLOCK_DRIFT;
-					ce.severity = OWL_SEV_CRITICAL;
-					ce.source = OWL_SRC_DAEMON;
-					ce.target_pid = (uint32_t)pipeline->target_pid;
+					init_daemon_event(&ce, OWL_EVENT_CLOCK_DRIFT,
+							  OWL_SEV_CRITICAL,
+							  (uint32_t)pipeline->target_pid);
 					snprintf(ce.payload.arm64.description,
 						 sizeof(ce.payload.arm64.description),
 						 "MONO vs RAW drift >50ms");

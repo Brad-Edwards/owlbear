@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include <bpf/libbpf.h>
@@ -96,17 +95,11 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 	case OWL_EVENT_VM_WRITEV_ATTEMPT:
 	case OWL_EVENT_MPROTECT_EXEC:
 		out->payload.memory.caller_pid = bev->pid;
-		memcpy(out->payload.memory.caller_comm, bev->comm,
-		       sizeof(out->payload.memory.caller_comm) < sizeof(bev->comm)
-		       ? sizeof(out->payload.memory.caller_comm)
-		       : sizeof(bev->comm));
+		OWL_COPY_FIELD(out->payload.memory.caller_comm, bev->comm);
 		break;
 
 	case OWL_EVENT_MODULE_LOAD:
-		memcpy(out->payload.module.name, bev->detail,
-		       sizeof(out->payload.module.name) < sizeof(bev->detail)
-		       ? sizeof(out->payload.module.name)
-		       : sizeof(bev->detail));
+		OWL_COPY_FIELD(out->payload.module.name, bev->detail);
 		break;
 
 	case OWL_EVENT_NET_CONNECT:
@@ -115,18 +108,12 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 		memcpy(&out->payload.network.dst_port, bev->detail + 4, 2);
 		memcpy(&out->payload.network.protocol, bev->detail + 6, 2);
 		memcpy(&out->payload.network.bytes,    bev->detail + 8, 8);
-		memcpy(out->payload.network.comm, bev->comm,
-		       sizeof(out->payload.network.comm) < sizeof(bev->comm)
-		       ? sizeof(out->payload.network.comm)
-		       : sizeof(bev->comm));
+		OWL_COPY_FIELD(out->payload.network.comm, bev->comm);
 		break;
 
 	default:
 		/* Copy detail into raw payload as fallback */
-		memcpy(out->payload.raw, bev->detail,
-		       sizeof(out->payload.raw) < sizeof(bev->detail)
-		       ? sizeof(out->payload.raw)
-		       : sizeof(bev->detail));
+		OWL_COPY_FIELD(out->payload.raw, bev->detail);
 		break;
 	}
 

@@ -18,6 +18,9 @@
 
 #include "hmac_sha256.h"
 
+/* Maximum .text size to hash (cap excessive memory use) */
+#define OWL_INTEGRITY_MAX_TEXT_SIZE  (16 * 1024 * 1024)
+
 /* Integrity checker state */
 struct owl_integrity {
 	pid_t    target_pid;

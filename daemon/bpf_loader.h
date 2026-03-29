@@ -13,8 +13,13 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "owlbear_events.h"
+
+/* Copy src to dst using the smaller of the two sizes (safe field copy) */
+#define OWL_COPY_FIELD(dst, src) \
+	memcpy((dst), (src), sizeof(dst) < sizeof(src) ? sizeof(dst) : sizeof(src))
 
 /* Opaque BPF context */
 struct owl_bpf_ctx;

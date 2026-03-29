@@ -67,23 +67,22 @@ int owl_selfprotect_watchdog(struct owl_self_protect *sp)
 	bool mod_present = owl_selfprotect_check_module();
 	if (!mod_present && sp->module_present) {
 		OWL_WARN("[ALERT] kernel module unloaded!");
-		result |= 0x01;
+		result |= OWL_SELFPROT_MODULE_GONE;
 	}
 	sp->module_present = mod_present;
 
 	/* Check 2: ioctl still works */
 	if (mod_present && !owl_selfprotect_check_ioctl(sp->dev_fd)) {
 		OWL_WARN("[ALERT] kernel module not responding!");
-		result |= 0x02;
+		result |= OWL_SELFPROT_IOCTL_FAIL;
 	}
 
 	/* Check 3: BPF ring buffer fd still valid */
 	if (sp->bpf_rb_fd >= 0) {
-		/* Use fcntl F_GETFD to check if fd is still open */
 		if (fcntl(sp->bpf_rb_fd, F_GETFD) < 0) {
 			if (sp->bpf_attached) {
 				OWL_WARN("[ALERT] BPF programs detached!");
-				result |= 0x04;
+				result |= OWL_SELFPROT_BPF_DETACHED;
 			}
 			sp->bpf_attached = false;
 		}

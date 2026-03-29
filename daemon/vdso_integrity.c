@@ -7,15 +7,13 @@
  * reading, buffer variants for testability).
  */
 
-#include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "vdso_integrity.h"
 #include "hmac_sha256.h"
+#include "proc_io.h"
 #include "log.h"
 
 /* -------------------------------------------------------------------------
@@ -64,79 +62,6 @@ int owl_vdso_parse_mapping(const char *maps, uint64_t *start, uint64_t *size)
 }
 
 /* -------------------------------------------------------------------------
- * Read /proc/<pid>/maps
- * ----------------------------------------------------------------------- */
-
-static char *read_proc_maps(pid_t pid)
-{
-	char path[64];
-	snprintf(path, sizeof(path), "/proc/%d/maps", pid);
-
-	FILE *f = fopen(path, "r");
-	if (!f)
-		return NULL;
-
-	size_t cap = 4096;
-	size_t len = 0;
-	char *buf = malloc(cap);
-	if (!buf) {
-		fclose(f);
-		return NULL;
-	}
-
-	size_t n;
-	while ((n = fread(buf + len, 1, cap - len - 1, f)) > 0) {
-		len += n;
-		if (len >= cap - 1) {
-			cap *= 2;
-			char *tmp = realloc(buf, cap);
-			if (!tmp) {
-				free(buf);
-				fclose(f);
-				return NULL;
-			}
-			buf = tmp;
-		}
-	}
-
-	buf[len] = '\0';
-	fclose(f);
-	return buf;
-}
-
-/* -------------------------------------------------------------------------
- * Read /proc/<pid>/mem at a given offset
- * ----------------------------------------------------------------------- */
-
-static int read_proc_mem(pid_t pid, uint64_t addr, uint8_t *buf, size_t len)
-{
-	char path[64];
-	snprintf(path, sizeof(path), "/proc/%d/mem", pid);
-
-	int fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return -1;
-
-	if (lseek(fd, (off_t)addr, SEEK_SET) == (off_t)-1) {
-		close(fd);
-		return -1;
-	}
-
-	size_t total = 0;
-	while (total < len) {
-		ssize_t n = read(fd, buf + total, len - total);
-		if (n <= 0) {
-			close(fd);
-			return -1;
-		}
-		total += (size_t)n;
-	}
-
-	close(fd);
-	return 0;
-}
-
-/* -------------------------------------------------------------------------
  * Public API
  * ----------------------------------------------------------------------- */
 
@@ -161,7 +86,7 @@ int owl_vdso_integrity_baseline(struct owl_vdso_integrity *ctx, pid_t pid)
 	ctx->baseline_set = false;
 
 	/* Read /proc/<pid>/maps to find [vdso] */
-	char *maps = read_proc_maps(pid);
+	char *maps = owl_read_proc_maps(pid);
 	if (!maps)
 		return -1;
 
@@ -177,7 +102,7 @@ int owl_vdso_integrity_baseline(struct owl_vdso_integrity *ctx, pid_t pid)
 	if (!buf)
 		return -1;
 
-	if (read_proc_mem(pid, ctx->vdso_start, buf, ctx->vdso_size) < 0) {
+	if (owl_read_proc_mem(pid, ctx->vdso_start, buf, ctx->vdso_size) < 0) {
 		free(buf);
 		return -1;
 	}
@@ -190,7 +115,7 @@ int owl_vdso_integrity_baseline(struct owl_vdso_integrity *ctx, pid_t pid)
 
 	char hex[OWL_HMAC_SHA256_LEN * 2 + 1];
 	for (size_t i = 0; i < OWL_HMAC_SHA256_LEN; i++)
-		sprintf(hex + 2 * i, "%02x", ctx->baseline_hmac[i]);
+		snprintf(hex + 2 * i, 3, "%02x", ctx->baseline_hmac[i]);
 
 	OWL_INFO("vdso baseline: start=0x%lx size=%lu hmac=%s",
 		 (unsigned long)ctx->vdso_start,
@@ -209,7 +134,7 @@ int owl_vdso_integrity_check(const struct owl_vdso_integrity *ctx)
 	if (!buf)
 		return -1;
 
-	if (read_proc_mem(ctx->target_pid, ctx->vdso_start,
+	if (owl_read_proc_mem(ctx->target_pid, ctx->vdso_start,
 			  buf, ctx->vdso_size) < 0) {
 		free(buf);
 		return -1;

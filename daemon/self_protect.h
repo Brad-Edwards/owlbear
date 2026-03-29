@@ -14,6 +14,11 @@
 
 #include <stdbool.h>
 
+/* Watchdog result bitmask */
+#define OWL_SELFPROT_MODULE_GONE  0x01  /* /sys/module/owlbear disappeared */
+#define OWL_SELFPROT_IOCTL_FAIL   0x02  /* OWL_IOC_GET_STATUS failed */
+#define OWL_SELFPROT_BPF_DETACHED 0x04  /* BPF ring buffer fd invalid */
+
 /* Self-protection state */
 struct owl_self_protect {
 	int  dev_fd;         /* /dev/owlbear fd for ioctl check */

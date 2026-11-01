@@ -33,7 +33,7 @@ jobs:
             libcurl4-openssl-dev libssl-dev libncurses-dev kmod \
             linux-headers-generic linux-tools-generic
           kdir=$(find /usr/src -maxdepth 1 -type d -name 'linux-headers-*-generic' | sort -V | tail -1)
-          bpftool=$(find /usr/lib/linux-tools -type f -name bpftool | sort -V | tail -1)
+          bpftool=$(find -L /usr/lib/linux-tools -type f -name bpftool | sort -V | tail -1)
           test -n "$kdir" && test -n "$bpftool"
           echo "KDIR=$kdir" >> "$GITHUB_ENV"
           echo "BPFTOOL=$bpftool" >> "$GITHUB_ENV"

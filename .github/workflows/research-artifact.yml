@@ -45,38 +45,12 @@ jobs:
           python3 scripts/research-artifact.py build --output repeat
           python3 - <<'PY'
           import json
-          import difflib
-          import subprocess
-          import tarfile
-          import tempfile
           from pathlib import Path
           first = json.loads(next(Path('dist').glob('*.manifest.json')).read_text())
           second = json.loads(next(Path('repeat').glob('*.manifest.json')).read_text())
           for name in first['files']:
               if first['files'][name] != second['files'][name]:
                   print('Non-reproducible payload:', name, flush=True)
-                  if name == 'kernel/owlbear.ko':
-                      with tempfile.TemporaryDirectory() as temporary:
-                          modules = []
-                          for directory in ('dist', 'repeat'):
-                              with tarfile.open(next(Path(directory).glob('*.tar.gz'))) as archive:
-                                  entry = next(item for item in archive if item.name.endswith('/kernel/owlbear.ko'))
-                                  module = Path(temporary) / directory
-                                  module.write_bytes(archive.extractfile(entry).read())
-                                  modules.append(module)
-                          left, right = [module.read_bytes() for module in modules]
-                          last = -100
-                          shown = 0
-                          for offset, (a, b) in enumerate(zip(left, right)):
-                              if a != b and offset > last + 80:
-                                  print('Different bytes at', offset, repr(left[max(0, offset-50):offset+100]), repr(right[max(0, offset-50):offset+100]), flush=True)
-                                  last = offset
-                                  shown += 1
-                                  if shown == 10:
-                                      break
-                          for options in (['-p', '.modinfo'], ['--debug-dump=info'], ['--debug-dump=rawline']):
-                              dumps = [subprocess.check_output(['readelf', *options, str(module)], text=True).splitlines() for module in modules]
-                              print('\n'.join(list(difflib.unified_diff(*dumps))[:60]), flush=True)
           PY
           diff dist/SHA256SUMS repeat/SHA256SUMS
       - name: Verify extracted installation and reported identity

@@ -186,7 +186,10 @@ def build(args):
         env = dict(os.environ, SOURCE_DATE_EPOCH=str(epoch), TZ="UTC", LC_ALL="C",
                    KBUILD_BUILD_USER="owlbear", KBUILD_BUILD_HOST="builder",
                    KBUILD_BUILD_VERSION="1", KBUILD_BUILD_TIMESTAMP=f"@{epoch}")
-        flags = f"-ffile-prefix-map={source}=/usr/src/owlbear -fdebug-prefix-map={source}=/usr/src/owlbear"
+        # Kbuild sets its own macro map. Set an explicit map for external
+        # sources too, so dynamic-debug __FILE__ strings cannot retain /tmp paths.
+        flags = " ".join(f"-f{kind}-prefix-map={source}=/usr/src/owlbear"
+                         for kind in ("file", "debug", "macro"))
         make = ["make", "-B", f"-j{args.jobs}", "CC=gcc", "CLANG=clang", f"KDIR={kdir}",
                 f"BPFTOOL={args.bpftool}", f"VMLINUX_BTF={btf}",
                 f"REPRO_CFLAGS={flags}", f"KCFLAGS={flags}", f"KAFLAGS={flags}",

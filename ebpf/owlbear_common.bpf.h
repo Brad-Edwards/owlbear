@@ -10,7 +10,13 @@
 #ifndef OWLBEAR_COMMON_BPF_H
 #define OWLBEAR_COMMON_BPF_H
 
+/* Older bpftool versions emit standalone type declarations inside structs
+ * when dumping newer kernel BTF. Limit this diagnostic exception to the
+ * generated header; keep -Werror for Owlbear's own BPF code. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-declarations"
 #include "vmlinux.h"
+#pragma clang diagnostic pop
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>

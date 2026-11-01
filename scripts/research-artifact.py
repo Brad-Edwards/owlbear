@@ -15,8 +15,10 @@ import platform
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
+import zlib
 
 
 SCHEMA = "owlbear.artifact/v1"
@@ -127,6 +129,10 @@ def build(args):
         raise ValueError("release builds require native ARM64 Linux (aarch64)")
     repo = Path(command(["git", "rev-parse", "--show-toplevel"]))
     commit = command(["git", "rev-parse", "HEAD"], repo)
+    committed_script = subprocess.check_output(
+        ["git", "show", f"{commit}:scripts/research-artifact.py"], cwd=repo)
+    if Path(__file__).read_bytes() != committed_script:
+        raise ValueError("commit changes to the artifact script before building")
     epoch = int(command(["git", "log", "-1", "--format=%ct", commit], repo))
     kdir = Path(args.kdir).resolve(strict=True)
     btf = Path(args.btf).resolve(strict=True)
@@ -154,6 +160,7 @@ def build(args):
             ("ld", "ld", "--version"), ("make", "make", "--version"),
             ("bpftool", args.bpftool, "version"),
         )}
+        tools.update(python=sys.version, zlib=zlib.ZLIB_RUNTIME_VERSION)
         inputs = {
             "toolchain": tools,
             "os_release": Path("/etc/os-release").read_text(),

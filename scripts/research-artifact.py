@@ -190,7 +190,7 @@ def build(args):
         # sources too, so dynamic-debug __FILE__ strings cannot retain /tmp paths.
         flags = " ".join(f"-f{kind}-prefix-map={source}=/usr/src/owlbear"
                          for kind in ("file", "debug", "macro"))
-        make = ["make", "-B", f"-j{args.jobs}", "CC=gcc", "CLANG=clang", f"KDIR={kdir}",
+        make = ["make", "-B", "V=1", f"-j{args.jobs}", "CC=gcc", "CLANG=clang", f"KDIR={kdir}",
                 f"BPFTOOL={args.bpftool}", f"VMLINUX_BTF={btf}",
                 f"REPRO_CFLAGS={flags}", f"KCFLAGS={flags}", f"KAFLAGS={flags}",
                 f"CFLAGS_EXTRA=-O2 -DNDEBUG {flags}"]

@@ -141,7 +141,9 @@ def build(args):
         raise ValueError(f"output already exists; choose a new directory: {output}")
 
     with tempfile.TemporaryDirectory(prefix="owlbear-build-") as temporary:
-        source = Path(temporary)
+        workspace = Path(temporary)
+        source = workspace / "source"
+        source.mkdir()
         # Build only the recorded commit. Ignore checkout dirt and tracked binaries.
         archive_bytes = subprocess.check_output(["git", "archive", commit], cwd=repo)
         with tarfile.open(fileobj=io.BytesIO(archive_bytes)) as archive:
@@ -168,7 +170,7 @@ def build(args):
             "btf_sha256": digest(btf.read_bytes()),
             "kernel_config_sha256": digest(config),
             "kernel_symvers_sha256": digest((kdir / "Module.symvers").read_bytes()),
-            "flags": "-O2 -DNDEBUG; source paths mapped to /usr/src/owlbear",
+            "flags": "-O2 -DNDEBUG; mapped source/header paths; kernel M=../source/kernel",
         }
         identity = {
             "schema": "owlbear.build/v1", "version": version, "source_commit": commit,
@@ -186,9 +188,14 @@ def build(args):
         env = dict(os.environ, SOURCE_DATE_EPOCH=str(epoch), TZ="UTC", LC_ALL="C",
                    KBUILD_BUILD_USER="owlbear", KBUILD_BUILD_HOST="builder",
                    KBUILD_BUILD_VERSION="1", KBUILD_BUILD_TIMESTAMP=f"@{epoch}")
-        # Kbuild sets its own macro map. Set an explicit map for external
-        # sources too, so dynamic-debug __FILE__ strings cannot retain /tmp paths.
-        flags = " ".join(f"-f{kind}-prefix-map={source}=/usr/src/owlbear"
+        # GCC 13's UBSAN location records ignore prefix maps. A private copy of
+        # the configured headers lets Kbuild use a stable relative source path
+        # without changing instrumentation or writing to system headers.
+        headers = workspace / "headers"
+        shutil.copytree(kdir, headers)
+        flags = " ".join(f"-f{kind}-prefix-map={path}={mapped}"
+                         for path, mapped in ((source, "/usr/src/owlbear"),
+                                              (headers, "/usr/src/owlbear-headers"))
                          for kind in ("file", "debug", "macro"))
         make = ["make", "-B", "V=1", f"-j{args.jobs}", "CC=gcc", "CLANG=clang", f"KDIR={kdir}",
                 f"BPFTOOL={args.bpftool}", f"VMLINUX_BTF={btf}",
@@ -196,7 +203,11 @@ def build(args):
                 f"CFLAGS_EXTRA=-O2 -DNDEBUG {flags}"]
         # Skeletons precede daemon compilation, including under parallel make.
         subprocess.run(make + ["ebpf"], cwd=source, env=env, check=True)
-        subprocess.run(make + ["kernel", "daemon", "game", "cheats"], cwd=source, env=env, check=True)
+        subprocess.run(["make", "-B", "V=1", f"-j{args.jobs}", "-C", str(headers),
+                        "M=../source/kernel", "ARCH=arm64", "CC=gcc",
+                        f"KCFLAGS={flags}", f"KAFLAGS={flags}", "modules"],
+                       cwd=source, env=env, check=True)
+        subprocess.run(make + ["daemon", "game", "cheats"], cwd=source, env=env, check=True)
         subprocess.run(make + ["test"], cwd=source, env=env, check=True)
         reported = json.loads(command([str(source / "daemon/owlbeard"), "--version"]))
         if reported != identity:

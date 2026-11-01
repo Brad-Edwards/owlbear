@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "owlbear_events.h"
+#include "owlbear_build.h"
 #include "bpf_loader.h"
 #include "event_pipeline.h"
 #include "integrity.h"
@@ -634,6 +635,7 @@ static void print_usage(const char *progname)
 		"  -s, --sigs <path>    Signature file (default: %s)\n"
 		"  -v, --verbose        Verbose output (show debug messages)\n"
 		"  -q, --quiet          Quiet output (errors and warnings only)\n"
+		"  -V, --version        Print build identity as JSON and exit\n"
 		"  -h, --help           Show this help\n"
 		"\n"
 		"Example:\n"
@@ -651,6 +653,7 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 		{ "sigs",    required_argument, NULL, 's' },
 		{ "verbose", no_argument,       NULL, 'v' },
 		{ "quiet",   no_argument,       NULL, 'q' },
+		{ "version", no_argument,       NULL, 'V' },
 		{ "help",    no_argument,       NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -665,7 +668,7 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 	cfg->device_path = OWL_DEVICE_PATH;
 	cfg->sigs_path = OWL_DEFAULT_SIGS_PATH;
 
-	while ((opt = getopt_long(argc, argv, "t:el:d:s:vqh", long_opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:el:d:s:vqVh", long_opts, NULL)) != -1) {
 		switch (opt) {
 		case 't':
 			errno = 0;
@@ -696,6 +699,9 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 			break;
 		case 'h':
 			print_usage(argv[0]);
+			exit(0);
+		case 'V':
+			puts(OWL_BUILD_INFO_JSON);
 			exit(0);
 		default:
 			print_usage(argv[0]);

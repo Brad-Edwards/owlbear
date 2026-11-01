@@ -147,8 +147,8 @@ static void pipeline_check_preload(struct owl_pipeline *pipe,
 	ev.source = OWL_SRC_DAEMON;
 	ev.pid = exec_ev->pid;
 	ev.target_pid = (uint32_t)pipe->target_pid;
-	strncpy(ev.payload.module.name, preload_val,
-		sizeof(ev.payload.module.name) - 1);
+	memcpy(ev.payload.module.name, preload_val,
+	       strnlen(preload_val, sizeof(ev.payload.module.name) - 1));
 
 	owl_pipeline_process(pipe, &ev);
 }

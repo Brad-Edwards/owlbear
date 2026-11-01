@@ -8,7 +8,7 @@ BPFTOOL  ?= bpftool
 BPF_CFLAGS := -g -O2 -target bpf \
               -D__TARGET_ARCH_arm64 \
               -I$(CURDIR)/../include \
-              -Wall -Werror
+              -Wall -Werror $(REPRO_CFLAGS)
 
 # eBPF program sources
 BPF_SRCS := owlbear_lsm.bpf.c \
@@ -21,13 +21,14 @@ BPF_SKELS := $(BPF_SRCS:.bpf.c=.skel.h)
 
 # vmlinux.h is generated from the running kernel's BTF
 VMLINUX_H := vmlinux.h
+VMLINUX_BTF ?= /sys/kernel/btf/vmlinux
 
 .PHONY: all clean vmlinux
 
 all: $(VMLINUX_H) $(BPF_OBJS) $(BPF_SKELS)
 
 $(VMLINUX_H):
-	$(BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > $@
+	$(BPFTOOL) btf dump file $(VMLINUX_BTF) format c > $@
 
 %.bpf.o: %.bpf.c $(VMLINUX_H)
 	$(CLANG) $(BPF_CFLAGS) -c -o $@ $<

@@ -88,6 +88,9 @@ Same plumbing. Kprobes + eBPF LSM is how CrowdStrike, SentinelOne, and Cilium Te
 
 ## Docs
 
+[Versioned ARM64 research builds](docs/research-artifacts.md): pinned artifacts,
+build manifests, checksums and inspection without running an experiment.
+
 [GitHub Pages site](https://brad-edwards.github.io/owlbear/)
 
 ## License

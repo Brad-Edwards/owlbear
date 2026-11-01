@@ -64,6 +64,16 @@ jobs:
                                   module = Path(temporary) / directory
                                   module.write_bytes(archive.extractfile(entry).read())
                                   modules.append(module)
+                          left, right = [module.read_bytes() for module in modules]
+                          last = -100
+                          shown = 0
+                          for offset, (a, b) in enumerate(zip(left, right)):
+                              if a != b and offset > last + 80:
+                                  print('Different bytes at', offset, repr(left[max(0, offset-50):offset+100]), repr(right[max(0, offset-50):offset+100]), flush=True)
+                                  last = offset
+                                  shown += 1
+                                  if shown == 10:
+                                      break
                           for options in (['-p', '.modinfo'], ['--debug-dump=info'], ['--debug-dump=rawline']):
                               dumps = [subprocess.check_output(['readelf', *options, str(module)], text=True).splitlines() for module in modules]
                               print('\n'.join(list(difflib.unified_diff(*dumps))[:60]), flush=True)

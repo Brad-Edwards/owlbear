@@ -43,6 +43,15 @@ jobs:
         run: |
           python3 scripts/research-artifact.py build --output dist
           python3 scripts/research-artifact.py build --output repeat
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          first = json.loads(next(Path('dist').glob('*.manifest.json')).read_text())
+          second = json.loads(next(Path('repeat').glob('*.manifest.json')).read_text())
+          for name in first['files']:
+              if first['files'][name] != second['files'][name]:
+                  print('Non-reproducible payload:', name, flush=True)
+          PY
           diff dist/SHA256SUMS repeat/SHA256SUMS
       - name: Verify extracted installation and reported identity
         run: |

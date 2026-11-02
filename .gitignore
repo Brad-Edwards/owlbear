@@ -86,3 +86,8 @@ core
 *.app
 
 temp/
+
+# Independent runtime adapter build inputs and outputs
+adapters/bigrae/build/
+adapters/bigrae/dist/
+adapters/bigrae/wheelhouse/

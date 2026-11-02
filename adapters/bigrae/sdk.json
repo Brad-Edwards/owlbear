@@ -1,0 +1,12 @@
+{
+  "repository": "OpenRAE/bigrae",
+  "artifact_id": 13122256039,
+  "run_id": 41401970151,
+  "artifact_sha256": "eac06416d754f2a0235c835689870655c36ba0a18eb652a508fd785ee53f8ede",
+  "source_revision": "9552c9f309eb9a286e5442db44d55ff0f408e19a",
+  "wheel": "bigrae_adapter_sdk-0.1.0-py3-none-any.whl",
+  "wheel_sha256": "226296944ac00047551f3e733e365489d78ba0ebbb1d8d5081a5c2cd0dc2f3e4",
+  "distribution": "bigrae-adapter-sdk",
+  "version": "0.1.0",
+  "artifact_name": "adapter-sdk-candidate-4760e5d05effdee487b92c3cec2603ca19f164ae"
+}

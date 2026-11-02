@@ -42,22 +42,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/checkout@v6
-        with:
-          repository: OpenRAE/bigrae
-          ref: 9552c9f309eb9a286e5442db44d55ff0f408e19a
-          path: .sdk-source
-          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Build and install independent wheels
+      - name: Install independently published SDK and adapter wheels
         run: |
-          python -m pip wheel --no-deps --wheel-dir /tmp/adapter-wheels .sdk-source/shifter/shifter_adapter_sdk adapters/bigrae
+          python - <<'PYSDK'
+          import hashlib,json,pathlib
+          root=pathlib.Path('adapters/bigrae')
+          sdk=json.loads((root/'sdk.json').read_text())
+          assert hashlib.sha256((root/'vendor'/sdk['wheel']).read_bytes()).hexdigest()==sdk['wheel_sha256']
+          PYSDK
+          python -m pip wheel --no-deps --wheel-dir /tmp/adapter-wheels adapters/bigrae
           python -m venv /tmp/adapter-runtime
-          /tmp/adapter-runtime/bin/pip install /tmp/adapter-wheels/*.whl
+          /tmp/adapter-runtime/bin/pip install adapters/bigrae/vendor/*.whl /tmp/adapter-wheels/*.whl
       - name: Test installed adapter and SDK worker
         run: /tmp/adapter-runtime/bin/python -I -m unittest discover -s adapters/bigrae/tests -v
+
+  bigrae-worker-release:
+    name: BigRAE worker and guest integration
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - name: Build exact worker and test SDK and guest execution
+        run: python3 adapters/bigrae/release.py --output /tmp/owlbear-worker-release --guest-integration
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owlbear-bigrae-worker-arm64
+          path: |
+            /tmp/owlbear-worker-release/worker.tar
+            /tmp/owlbear-worker-release/wheelhouse/*.whl
+            /tmp/owlbear-worker-release/*.json
+            /tmp/owlbear-worker-release/requirements.lock
+            /tmp/owlbear-worker-release/SHA256SUMS
+          if-no-files-found: error
 
   cross-compile:
     name: ARM64 cross-compile

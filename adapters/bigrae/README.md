@@ -11,30 +11,64 @@ Build with `uv build --wheel adapters/bigrae`. Install the SDK and adapter wheel
 in a separate environment, then run its Python against `adapters/bigrae/tests`.
 Do not add the BigRAE checkout to PYTHONPATH or copy platform code into the worker.
 
-The SDK coordinate is not currently on PyPI. The public SDK
-[documentation](https://github.com/OpenRAE/bigrae/blob/9552c9f309eb9a286e5442db44d55ff0f408e19a/shifter/shifter_adapter_sdk/README.md)
-permits exact candidate wheels for development. CI builds that pinned public
-revision, installs both wheels independently and exercises the SDK worker.
-Record the SDK wheel SHA-256 with each image build; a version alone does not
-identify a candidate. Local testing used wheel SHA-256
-`b61e1e7b7b12bd3726dc8cfb23c0dd4de4d3c4e7ab8704548683355aedd4102a`.
-These tests establish candidate compatibility, not SDK publication or live qualification.
+## Complete worker delivery
 
-For the Dockerfile supply an approved Python >=3.12 base image by registry digest.
-Populate `wheelhouse/` with approved wheels and a `requirements.lock` pinning
-and hashing every dependency, the SDK and this adapter. Pip installs offline
-with `--require-hashes`. Publish only through the existing authorized registry
-process, then generate the installation declaration with its resolved digest:
+The adapter consumes the SDK's **published CI distribution**, the route supported
+by the upstream SDK for independent adapters. `sdk.json` records the upstream
+repository, artifact ID, run, revision, ZIP hash and wheel hash. The exact 33 KB
+MIT-licensed SDK wheel is preserved under `vendor/`, including its license, so
+expiration of an upstream CI download cannot change or break this release.
+There is no dependency on an unpublished PyPI coordinate or a mutable checkout.
 
 ```sh
-owlbear-bigrae-manifest --worker-image 'REGISTRY/REPOSITORY@sha256:ACTUAL_DIGEST'
+python3 adapters/bigrae/release.py --output /absolute/new/release-directory --guest-integration
 ```
 
-Tags and missing digests are rejected. No fabricated deployable digest or registry
-publication is included. A deployment is incomplete until the publisher records
-the actual image digest and SDK wheel identity. Run with UID/GID 65532, read-only root, network disabled,
-and bounded tmpfs `/tmp`, as required by the SDK. Worker architecture is separate
-from guest architecture. The worker requires neither root nor cloud credentials.
+The complete integration run requires native ARM64, Docker, `skopeo` and `uv`. Omit
+`--guest-integration` for local worker tests on x86; CI runs the full ARM64 path.
+The script verifies the SDK hash, builds the adapter wheel, resolves the exact
+versions in `constraints.txt` into a hash-locked wheelhouse for Python 3.12, and
+builds the worker from the pinned multi-architecture Python image. The Dockerfile
+installs all wheels offline using `--require-hashes`.
+
+A disposable **loopback-only local registry** provides the worker's real registry
+manifest digest. The script pushes and pulls that exact identity, tests it under
+BigRAE's restrictions, and verifies the exported archive contains the same manifest
+and intact blobs. No external registry, cloud provider or BigRAE tenant is used.
+The registry container is removed even after a test failure.
+
+The release directory and the CI artifact `owlbear-bigrae-worker-arm64` contain:
+
+- `worker.tar`: standard containers/image directory transport archive, with its registry manifest preserved.
+- `image.json`: registry digest, image identity, architecture, base image and SDK identity.
+- SDK, adapter and dependency wheels, plus `requirements.lock` and `SHA256SUMS`.
+- `worker-integration.json` and `guest-integration.json`: authoritative test receipts.
+- `integration-installation.json`: the exact SDK installation declaration tested.
+
+The installation declaration's loopback address belongs to the disposable test
+registry. To install later, extract the archive and use `skopeo copy --all --preserve-digests
+dir:/extracted/image docker://AUTHORIZED_REGISTRY/REPOSITORY:VERSION` without
+changing its manifest and generate the declaration with that registry and the
+recorded digest. The registry name may change; the digest must match `image.json`:
+
+```sh
+owlbear-bigrae-manifest --worker-image 'AUTHORIZED_REGISTRY/REPOSITORY@sha256:RECORDED_DIGEST'
+```
+
+This is artifact delivery and integration qualification, not live-tenant deployment.
+The worker runs with UID/GID 65532, no network, no capabilities, read-only root,
+bounded memory/PIDs and a bounded `/tmp` tmpfs. All five SDK phases execute from
+the actual digest; the test also checks that platform modules are absent.
+
+The separate ARM64 guest test executes complete generated configure/verify scripts
+against the real daemon linked to the repository's explicit fake ioctl/BPF fixture.
+Its module-loader fixture writes a build note into **private tmpfs sysfs**, never
+host sysfs. The test container alone enables SYS_PTRACE and removes AppArmor's
+sysfs restriction for this fake filesystem. It loads no real kernel module.
+Configuration, idempotent retry, verification, wrong-release and wrong-enforcement
+readback, and artifact tampering are checked. This fixture cannot enter the worker
+image or adapter wheel. Live sensor/attack qualification remains issue #34 and is
+outside these integration tests.
 
 ## Configuration
 

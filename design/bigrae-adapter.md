@@ -23,3 +23,21 @@ hash-locked wheelhouse, without fetching packages. No fabricated image digest
 or publication claim is committed. Tests install built SDK/adapter wheels in a
 separate environment and exercise the actual worker; guest predicates have
 negative tests and a deliberate mutation check.
+
+## Completed delivery and integration boundary
+
+Consume the already published upstream CI SDK wheel by artifact ID and SHA-256,
+including its MIT license; do not rebuild it or require a new PyPI release.
+`release.py` creates a hash-locked wheelhouse, worker image, real registry
+manifest identity and portable image archive. A disposable loopback registry
+exists only for the integration test. CI retains the archive, exact SDK and
+adapter wheels, installation declaration, hashes and test receipts through the
+repository's existing artifact service. No production registry or tenant is used.
+
+The production worker runs with no network, no capabilities, UID 65532, read-only
+root and bounded tmpfs. Guest integration runs on native ARM64 in a separate
+container, using the real daemon linked to the existing explicit ioctl/BPF
+fixture. Only the guest test has private writable fake sysfs and a fake module
+loader. It never mounts host sysfs or loads a real module. Configure, retry,
+verify and negative readbacks execute complete SDK-generated guest scripts.
+The guest fixture cannot enter the worker image or runtime package.

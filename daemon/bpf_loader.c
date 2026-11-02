@@ -165,7 +165,7 @@ static int libbpf_print_fn(enum libbpf_print_level level,
 
 /* -------------------------------------------------------------------------
  * Map fd extraction — find the protected_pids fd from whichever
- * skeleton loaded first (maps are shared via BTF map pinning).
+ * skeleton loaded first (legacy single-map accessors only).
  * ----------------------------------------------------------------------- */
 
 static int find_map_fd(struct owl_bpf_ctx *ctx, const char *name)
@@ -209,6 +209,12 @@ static int find_map_fd(struct owl_bpf_ctx *ctx, const char *name)
 
 struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 {
+	return owl_bpf_init_selected(cb, cb_ctx, OWL_BPF_ALL, true);
+}
+
+struct owl_bpf_ctx *owl_bpf_init_selected(owl_bpf_event_cb cb, void *cb_ctx,
+                                        unsigned sensors, bool enforce)
+{
 	struct owl_bpf_ctx *ctx;
 	int err;
 
@@ -224,9 +230,17 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 	libbpf_set_print(libbpf_print_fn);
 
 	/* --- LSM skeleton --- */
-	ctx->lsm = owlbear_lsm_bpf__open_and_load();
+	ctx->lsm = (sensors & 1u) ? owlbear_lsm_bpf__open() : NULL;
+	if (ctx->lsm) {
+		ctx->lsm->rodata->enforce_mode = enforce;
+		if (owlbear_lsm_bpf__load(ctx->lsm)) {
+			owlbear_lsm_bpf__destroy(ctx->lsm);
+			ctx->lsm = NULL;
+		}
+	}
 	if (!ctx->lsm) {
-		OWL_WARN("BPF LSM load failed: %s", strerror(errno));
+		if (sensors & 1u)
+			OWL_WARN("BPF LSM load failed: %s", strerror(errno));
 	} else {
 		err = owlbear_lsm_bpf__attach(ctx->lsm);
 		if (err) {
@@ -240,9 +254,10 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 	}
 
 	/* --- Tracepoint skeleton --- */
-	ctx->trace = owlbear_trace_bpf__open_and_load();
+	ctx->trace = (sensors & 2u) ? owlbear_trace_bpf__open_and_load() : NULL;
 	if (!ctx->trace) {
-		OWL_WARN("BPF trace load failed: %s", strerror(errno));
+		if (sensors & 2u)
+			OWL_WARN("BPF trace load failed: %s", strerror(errno));
 	} else {
 		err = owlbear_trace_bpf__attach(ctx->trace);
 		if (err) {
@@ -256,9 +271,10 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 	}
 
 	/* --- Kprobe skeleton --- */
-	ctx->kprobe = owlbear_kprobe_bpf__open_and_load();
+	ctx->kprobe = (sensors & 4u) ? owlbear_kprobe_bpf__open_and_load() : NULL;
 	if (!ctx->kprobe) {
-		OWL_WARN("BPF kprobe load failed: %s", strerror(errno));
+		if (sensors & 4u)
+			OWL_WARN("BPF kprobe load failed: %s", strerror(errno));
 	} else {
 		err = owlbear_kprobe_bpf__attach(ctx->kprobe);
 		if (err) {
@@ -272,9 +288,10 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 	}
 
 	/* --- Net kprobe skeleton --- */
-	ctx->net = owlbear_net_bpf__open_and_load();
+	ctx->net = (sensors & 8u) ? owlbear_net_bpf__open_and_load() : NULL;
 	if (!ctx->net) {
-		OWL_WARN("BPF net load failed: %s", strerror(errno));
+		if (sensors & 8u)
+			OWL_WARN("BPF net load failed: %s", strerror(errno));
 	} else {
 		err = owlbear_net_bpf__attach(ctx->net);
 		if (err) {
@@ -297,14 +314,26 @@ struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx)
 	ctx->protected_pids_fd = find_map_fd(ctx, "protected_pids");
 	ctx->allowed_pids_fd = find_map_fd(ctx, "allowed_pids");
 
-	/* Set up ring buffer */
-	int events_fd = find_map_fd(ctx, "events");
-	if (events_fd >= 0) {
-		ctx->ringbuf = ring_buffer__new(events_fd,
-						ringbuf_event_handler,
-						ctx, NULL);
+	/* Objects own distinct rings: consume every attached source. */
+	struct bpf_object *objects[] = {
+		ctx->lsm ? ctx->lsm->obj : NULL,
+		ctx->trace ? ctx->trace->obj : NULL,
+		ctx->kprobe ? ctx->kprobe->obj : NULL,
+		ctx->net ? ctx->net->obj : NULL,
+	};
+	for (unsigned i = 0; i < 4; i++) {
+		if (!objects[i]) continue;
+		int fd = bpf_object__find_map_fd_by_name(objects[i], "events");
+		if (fd < 0) { owl_bpf_destroy(ctx); return NULL; }
+		if (!ctx->ringbuf)
+			ctx->ringbuf = ring_buffer__new(fd, ringbuf_event_handler, ctx, NULL);
+		else if (ring_buffer__add(ctx->ringbuf, fd, ringbuf_event_handler, ctx)) {
+			owl_bpf_destroy(ctx);
+			return NULL;
+		}
 		if (!ctx->ringbuf) {
-			OWL_ERR("ring buffer setup failed");
+			owl_bpf_destroy(ctx);
+			return NULL;
 		}
 	}
 
@@ -383,4 +412,31 @@ bool owl_bpf_has_kprobe(const struct owl_bpf_ctx *ctx)
 bool owl_bpf_has_net(const struct owl_bpf_ctx *ctx)
 {
 	return ctx && ctx->has_net;
+}
+
+unsigned owl_bpf_attached(const struct owl_bpf_ctx *ctx)
+{
+	return owl_bpf_has_lsm(ctx) | (owl_bpf_has_trace(ctx) << 1) |
+	       (owl_bpf_has_kprobe(ctx) << 2) | (owl_bpf_has_net(ctx) << 3);
+}
+
+int owl_bpf_configure(struct owl_bpf_ctx *ctx, uint32_t target, uint32_t daemon_pid)
+{
+	if (!ctx) return -1;
+	struct bpf_object *objects[] = {
+		ctx->lsm ? ctx->lsm->obj : NULL, ctx->trace ? ctx->trace->obj : NULL,
+		ctx->kprobe ? ctx->kprobe->obj : NULL, ctx->net ? ctx->net->obj : NULL,
+	};
+	uint32_t value = 1;
+	for (unsigned i = 0; i < 4; i++) {
+		if (!objects[i]) continue;
+		int protected_fd = bpf_object__find_map_fd_by_name(objects[i], "protected_pids");
+		int allowed_fd = bpf_object__find_map_fd_by_name(objects[i], "allowed_pids");
+		if (protected_fd < 0 || allowed_fd < 0 ||
+		    bpf_map_update_elem(allowed_fd, &daemon_pid, &value, BPF_ANY) ||
+		    bpf_map_update_elem(allowed_fd, &target, &value, BPF_ANY) ||
+		    bpf_map_update_elem(protected_fd, &target, &value, BPF_ANY))
+			return -1;
+	}
+	return 0;
 }

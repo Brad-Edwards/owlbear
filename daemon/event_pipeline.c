@@ -54,6 +54,20 @@ enum owl_policy_action owl_pipeline_process(struct owl_pipeline *pipe,
 		return OWL_ACT_OBSERVE;
 
 	pipe->events_processed++;
+	if (pipe->event_file) {
+		FILE *f = pipe->event_file;
+		fprintf(f, "{\"schema\":\"owlbear.event.v1\",\"epoch\":%u,"
+			"\"timestamp_ns\":%llu,\"type\":%u,\"severity\":%u,\"source\":%u,"
+			"\"pid\":%u,\"target_pid\":%u,\"sequence\":%u,\"comm_hex\":\"",
+			pipe->epoch, (unsigned long long)ev->timestamp_ns, ev->event_type,
+			ev->severity, ev->source, ev->pid, ev->target_pid, ev->sequence);
+		for (unsigned i = 0; i < sizeof(ev->comm); i++)
+			fprintf(f, "%02x", (unsigned char)ev->comm[i]);
+		fputs("\",\"payload_hex\":\"", f);
+		for (unsigned i = 0; i < sizeof(ev->payload.raw); i++)
+			fprintf(f, "%02x", ev->payload.raw[i]);
+		fputs("\"}\n", f);
+	}
 
 	enum owl_policy_action action = owl_policy_evaluate(
 		pipe->policy, ev->event_type, ev->severity);

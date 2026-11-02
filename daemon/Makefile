@@ -17,6 +17,7 @@ DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 
 # Source files
 SRCS     := main.c \
+            experiment.c \
             bpf_loader.c \
             event_pipeline.c \
             process_tree.c \

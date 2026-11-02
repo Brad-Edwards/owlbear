@@ -1,0 +1,92 @@
+name: Research artifact
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ARM64 artifact and reproducibility
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang llvm libbpf-dev libelf-dev zlib1g-dev \
+            libcurl4-openssl-dev libssl-dev libncurses-dev kmod \
+            linux-headers-generic linux-tools-generic
+          kdir=$(find /usr/src -maxdepth 1 -type d -name 'linux-headers-*-generic' | sort -V | tail -1)
+          bpftool=$(find -L /usr/lib/linux-tools -type f -name bpftool | sort -V | tail -1)
+          test -n "$kdir" && test -n "$bpftool"
+          echo "KDIR=$kdir" >> "$GITHUB_ENV"
+          echo "BPFTOOL=$bpftool" >> "$GITHUB_ENV"
+      - name: Test packaging and integrity checks
+        run: make artifact-test
+      - name: Build twice from the same committed inputs
+        run: |
+          python3 scripts/research-artifact.py build --output dist
+          python3 scripts/research-artifact.py build --output repeat
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          first = json.loads(next(Path('dist').glob('*.manifest.json')).read_text())
+          second = json.loads(next(Path('repeat').glob('*.manifest.json')).read_text())
+          for name in first['files']:
+              if first['files'][name] != second['files'][name]:
+                  print('Non-reproducible payload:', name, flush=True)
+          PY
+          diff dist/SHA256SUMS repeat/SHA256SUMS
+      - name: Verify extracted installation and reported identity
+        run: |
+          mkdir installed
+          tar -xzf dist/*.tar.gz -C installed --strip-components=1
+          python3 scripts/research-artifact.py verify installed > expected.json
+          installed/daemon/owlbeard --version > actual.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assert json.loads(Path('expected.json').read_text()) == json.loads(Path('actual.json').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owlbear-arm64
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: Draft versioned release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: owlbear-arm64
+          path: dist
+      - name: Attach verified artifacts to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --draft --title "Owlbear $GITHUB_REF_NAME" \
+            --notes 'ARM64 research build. See the manifest for exact inputs and kernel requirements. Build verification does not establish live enforcement or research results.' \
+            dist/*

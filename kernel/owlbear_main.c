@@ -24,12 +24,15 @@
 #include <linux/ktime.h>
 
 #include "owlbear_common.h"
+#include "owlbear_build.h"
 
 /* Module metadata */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Owlbear Project");
 MODULE_DESCRIPTION("ARM64 anti-cheat kernel module prototype");
-MODULE_VERSION("0.1.0");
+MODULE_VERSION(OWL_BUILD_VERSION);
+MODULE_INFO(build_id, OWL_BUILD_ID);
+MODULE_INFO(source_commit, OWL_BUILD_COMMIT);
 
 /* Module parameters */
 static int target_pid_param;

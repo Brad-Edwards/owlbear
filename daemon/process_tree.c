@@ -242,8 +242,8 @@ int owl_ptree_on_event(struct owl_ptree *tree,
 		    tree->nodes[slot].birth_time == ev->timestamp_ns) {
 			memset(tree->nodes[slot].comm, 0,
 			       sizeof(tree->nodes[slot].comm));
-			strncpy(tree->nodes[slot].comm, ev->comm,
-				sizeof(tree->nodes[slot].comm) - 1);
+			memcpy(tree->nodes[slot].comm, ev->comm,
+			       strnlen(ev->comm, sizeof(tree->nodes[slot].comm) - 1));
 			return 0;
 		}
 		/* PID not found or different birth_time — insert */

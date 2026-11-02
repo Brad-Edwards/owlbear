@@ -50,6 +50,7 @@ tests/test_runner
 *.mod
 *.smod
 .cache/
+dist/
 compile_commands.json
 
 # --- Editor/IDE ---

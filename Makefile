@@ -19,7 +19,7 @@
 #   V              Verbose build (V=1)
 #   DEBUG          Debug build with sanitizers (DEBUG=1)
 
-.PHONY: all kernel ebpf daemon game cheats test integration clean help
+.PHONY: all kernel ebpf daemon game cheats test integration clean help artifact artifact-test
 
 # Detect architecture
 ARCH ?= $(shell uname -m)
@@ -94,6 +94,13 @@ integration:
 	@echo "=== Running integration tests (requires root + ARM64) ==="
 	$(MAKE) -C tests integration
 
+# Release builds use committed sources in a temporary tree, never this checkout.
+artifact:
+	python3 scripts/research-artifact.py build --output dist
+
+artifact-test:
+	python3 -m unittest discover -s tests -p 'test_research_artifact.py' -v
+
 # -------------------------------------------------------------------------
 # Cleanup
 # -------------------------------------------------------------------------
@@ -125,6 +132,8 @@ help:
 	@echo "  cheats        Build test cheat programs"
 	@echo "  test          Run unit tests"
 	@echo "  integration   Run integration tests (root + ARM64)"
+	@echo "  artifact      Build a versioned ARM64 archive from HEAD (no root)"
+	@echo "  artifact-test Test packaging and integrity checks (any architecture)"
 	@echo "  clean         Remove all build artifacts"
 	@echo "  help          Show this help"
 	@echo ""

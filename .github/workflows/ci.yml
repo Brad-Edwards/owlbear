@@ -37,6 +37,28 @@ jobs:
           CEOF
           gcc -std=c11 -Wall -Werror -Iinclude -o /tmp/check_size /tmp/check_size.c
 
+  bigrae-adapter:
+    name: Independent BigRAE adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: OpenRAE/bigrae
+          ref: 9552c9f309eb9a286e5442db44d55ff0f408e19a
+          path: .sdk-source
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build and install independent wheels
+        run: |
+          python -m pip wheel --no-deps --wheel-dir /tmp/adapter-wheels .sdk-source/shifter/shifter_adapter_sdk adapters/bigrae
+          python -m venv /tmp/adapter-runtime
+          /tmp/adapter-runtime/bin/pip install /tmp/adapter-wheels/*.whl
+      - name: Test installed adapter and SDK worker
+        run: /tmp/adapter-runtime/bin/python -I -m unittest discover -s adapters/bigrae/tests -v
+
   cross-compile:
     name: ARM64 cross-compile
     runs-on: ubuntu-latest

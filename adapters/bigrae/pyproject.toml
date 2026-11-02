@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools==84.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "owlbear-bigrae-adapter"
+version = "0.1.0"
+description = "Owlbear release configuration and guest readiness for BigRAE"
+requires-python = ">=3.12"
+license = "GPL-2.0-only"
+dependencies = ["bigrae-adapter-sdk[runtime]==0.1.0"]
+
+[project.entry-points."bigrae.runtime.plugins"]
+owlbear = "owlbear_bigrae:factory"
+
+[project.scripts]
+owlbear-bigrae-manifest = "owlbear_bigrae:main"
+
+[tool.setuptools.package-data]
+owlbear_bigrae = ["guest.py"]

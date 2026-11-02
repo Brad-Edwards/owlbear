@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!wheelhouse/
+!wheelhouse/*.whl
+!wheelhouse/requirements.lock

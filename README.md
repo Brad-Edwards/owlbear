@@ -93,6 +93,8 @@ Same plumbing. Kprobes + eBPF LSM is how CrowdStrike, SentinelOne, and Cilium Te
 
 Experiment controllers: [versioned control and telemetry interfaces](docs/experiment-interface.md).
 
+BigRAE integration: [independent runtime adapter](adapters/bigrae/README.md).
+
 ## Docs
 
 Commit hooks follow the usual pre-commit setup (`pre-commit install`) and only

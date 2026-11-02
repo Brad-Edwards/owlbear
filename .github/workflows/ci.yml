@@ -66,6 +66,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
+      - name: Install image archive tool
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends skopeo
       - name: Build exact worker and test SDK and guest execution
         run: python3 adapters/bigrae/release.py --output /tmp/owlbear-worker-release --guest-integration
       - uses: actions/upload-artifact@v4

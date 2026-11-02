@@ -85,18 +85,15 @@ def build(destination, guest):
             if value.startswith(tagged.rsplit(':',1)[0]+'@'))
         digest=repository_digest.rsplit('@',1)[1]
         run(['docker','pull',repository_digest])
-        run(['docker','save','--output',destination/'worker.tar',tagged])
-        with tarfile.open(destination/'worker.tar') as archive:
-            found=False
-            for member in archive:
-                if member.isfile() and member.name.startswith('blobs/sha256/'):
-                    expected=member.name.rsplit('/',1)[1]
-                    actual=hashlib.file_digest(archive.extractfile(member),'sha256').hexdigest()
-                    if actual != expected:
-                        raise ValueError('exported image blob integrity mismatch')
-                    found |= expected == digest.removeprefix('sha256:')
-            if not found:
-                raise ValueError('exported archive lacks the exact registry manifest')
+        # Docker's classic `save` rewrites/discards the registry manifest. Use
+        # the standard containers/image directory transport to preserve its bytes.
+        image_directory=destination/'image'
+        run(['skopeo','copy','--all','--preserve-digests','--src-tls-verify=false',
+             'docker://'+repository_digest,'dir:'+str(image_directory)])
+        if sha(image_directory/'manifest.json') != digest.removeprefix('sha256:'):
+            raise ValueError('exported image does not preserve the registry manifest')
+        with tarfile.open(destination/'worker.tar','w') as archive:
+            archive.add(image_directory,arcname='.')
         # The release's runner installs only wheels, never application source.
         environment=destination/'test-runtime'
         run(['uv','venv','--python','3.12',environment])

@@ -76,7 +76,7 @@ from pathlib import Path
 import subprocess,sys
 note=Path('/sys/module/owlbear/notes/.note.gnu.build-id')
 note.parent.mkdir(parents=True)
-subprocess.run(['objcopy','--dump-section','.note.gnu.build-id='+str(note),sys.argv[1]],check=True)
+subprocess.run(['objcopy','--dump-section','.note.gnu.build-id='+str(note),sys.argv[1],'/run/fixture-module-copy'],check=True)
 ''')
     loader.chmod(0o755)
     os.mkfifo('/dev/owlbear',0o600)

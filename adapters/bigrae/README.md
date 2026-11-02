@@ -24,7 +24,7 @@ There is no dependency on an unpublished PyPI coordinate or a mutable checkout.
 python3 adapters/bigrae/release.py --output /absolute/new/release-directory --guest-integration
 ```
 
-The complete integration run requires native ARM64, Docker and `uv`. Omit
+The complete integration run requires native ARM64, Docker, `skopeo` and `uv`. Omit
 `--guest-integration` for local worker tests on x86; CI runs the full ARM64 path.
 The script verifies the SDK hash, builds the adapter wheel, resolves the exact
 versions in `constraints.txt` into a hash-locked wheelhouse for Python 3.12, and
@@ -39,14 +39,15 @@ The registry container is removed even after a test failure.
 
 The release directory and the CI artifact `owlbear-bigrae-worker-arm64` contain:
 
-- `worker.tar`: portable worker image, with its exact registry manifest preserved.
+- `worker.tar`: standard containers/image directory transport archive, with its registry manifest preserved.
 - `image.json`: registry digest, image identity, architecture, base image and SDK identity.
 - SDK, adapter and dependency wheels, plus `requirements.lock` and `SHA256SUMS`.
 - `worker-integration.json` and `guest-integration.json`: authoritative test receipts.
 - `integration-installation.json`: the exact SDK installation declaration tested.
 
 The installation declaration's loopback address belongs to the disposable test
-registry. To install later, import the archive into the authorized registry without
+registry. To install later, extract the archive and use `skopeo copy --all --preserve-digests
+dir:/extracted/image docker://AUTHORIZED_REGISTRY/REPOSITORY:VERSION` without
 changing its manifest and generate the declaration with that registry and the
 recorded digest. The registry name may change; the digest must match `image.json`:
 

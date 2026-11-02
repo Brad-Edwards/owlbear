@@ -54,9 +54,14 @@ sudo ./daemon/owlbeard --target $(pidof owlbear-game) --enforce
 
 ### New instance
 
+Provisioning is a manual operation using an authorized local AWS profile.
+See [manual AWS deployment](deploy/terraform/README.md) for plan review and apply.
+
 ```bash
 cd deploy/terraform/environments/dev
-terraform init && terraform apply
+terraform init
+terraform plan
+terraform apply
 ```
 
 Userdata installs deps, clones, builds. ~5 min.
@@ -87,6 +92,11 @@ sudo scripts/verify.sh
 Same plumbing. Kprobes + eBPF LSM is how CrowdStrike, SentinelOne, and Cilium Tetragon work. Anti-cheat protects one process from everything else. EDR protects the system from specific threats. This prototype sits in the overlap.
 
 ## Docs
+
+Commit hooks follow the usual pre-commit setup (`pre-commit install`) and only
+check staged file hygiene and credentials. Full unit suites, ARM64 builds and
+artifact reproducibility checks run in CI. Runtime experiment qualification is
+performed separately on the admitted study environment.
 
 [Versioned ARM64 research builds](docs/research-artifacts.md): pinned artifacts,
 build manifests, checksums and inspection without running an experiment.

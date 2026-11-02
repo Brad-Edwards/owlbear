@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Native ARM64 artifact CI, repeat-build comparison and draft GitHub releases.
 - `owlbeard --version` and kernel module metadata report the release build identity.
 
+### Changed
+- CI validates Terraform without AWS access. AWS provisioning and remote builds
+  are manual operations, separate from research artifact verification.
+- Commit hooks check staged file hygiene and credentials only; full test suites
+  and artifact verification run in CI.
+
 ## [2.6.0] - 2026-03-15
 
 ### Added

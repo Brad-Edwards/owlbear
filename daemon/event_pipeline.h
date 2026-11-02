@@ -34,6 +34,9 @@ struct owl_pipeline {
 	bool                       enforce;
 	FILE                      *log_file;
 
+	FILE *event_file; /* Optional v1 JSONL evidence, separate from human logs. */
+	uint32_t epoch;
+
 	/* Statistics */
 	uint32_t events_processed;
 	uint32_t actions_block;

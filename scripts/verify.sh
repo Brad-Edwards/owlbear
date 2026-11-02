@@ -347,6 +347,76 @@ HEADER
     pass "Preflight OK"
 }
 
+# Machine-facing interface verification. All artifacts remain in the evidence package.
+phase_interfaces() {
+    local phase_dir="${OUT_DIR}/interfaces"
+    mkdir -p "${phase_dir}"
+    chmod 700 "${phase_dir}"
+    phase_dir=$(cd "${phase_dir}" && pwd)
+    if [ ! -f "${PROJECT_DIR}/kernel/owlbear.ko" ]; then
+        assert_skip "interfaces" "kernel module unavailable"
+        return
+    fi
+    start_game
+    if lsmod | grep -q owlbear; then rmmod owlbear || return 1; fi
+    insmod "${PROJECT_DIR}/kernel/owlbear.ko" target_pid="${GAME_PID}" || return 1
+    local mode sensors
+    for mode in observe enforce; do
+        # Exercise explicit disabled and enabled group selection.
+        sensors=none
+        local args=()
+        if [ "${mode}" = enforce ]; then sensors=all; args=(--enforce); fi
+        local run_dir
+        run_dir=$(mktemp -d "${phase_dir}/${mode}.XXXXXX")
+        "${PROJECT_DIR}/daemon/owlbeard" --target "${GAME_PID}" "${args[@]}" \
+            --sensors "${sensors}" --control "${run_dir}/control.sock" \
+            --events "${run_dir}/events.jsonl" \
+            --sigs "${PROJECT_DIR}/signatures/default.sigs" \
+            > "${run_dir}/daemon.log" 2>&1 &
+        DAEMON_PID=$!
+        local tries=0
+        while [ ! -S "${run_dir}/control.sock" ] && [ "$tries" -lt 50 ]; do
+            sleep 0.1
+            tries=$((tries + 1))
+        done
+        local command
+        for command in health reset flush stop; do
+            if python3 "${PROJECT_DIR}/scripts/owlbearctl.py" \
+                --socket "${run_dir}/control.sock" "${command}" > "${run_dir}/${command}.json"; then
+                assert_pass "interfaces/${mode}/${command}"
+            else
+                assert_fail "interfaces/${mode}/${command}"
+                if [ "${command}" = stop ]; then kill "${DAEMON_PID}" 2>/dev/null || true; fi
+            fi
+        done
+        wait "${DAEMON_PID}" || assert_fail "interfaces/${mode}/daemon exit"
+        DAEMON_PID=""
+        if python3 - "${run_dir}" "${mode}" <<'PYVERIFY'
+import json, pathlib, sys
+run = pathlib.Path(sys.argv[1])
+health = json.loads((run / 'health.json').read_text())
+assert health['schema'] == 'owlbear.control.v1'
+assert health['ready'], health
+assert health['kernel_enforce'] == (sys.argv[2] == 'enforce')
+assert health['attached_bpf'] == (15 if sys.argv[2] == 'enforce' else 0)
+reset = json.loads((run / 'reset.json').read_text())
+assert reset['epoch'] == 1 and reset['events_processed'] == 0
+for line in (run / 'events.jsonl').read_text().splitlines():
+    event = json.loads(line)
+    assert event['schema'] == 'owlbear.event.v1'
+    assert len(bytes.fromhex(event['payload_hex'])) == 64
+    assert len(bytes.fromhex(event['comm_hex'])) == 16
+PYVERIFY
+        then
+            assert_pass "interfaces/${mode}/realized state and schemas"
+        else
+            assert_fail "interfaces/${mode}/realized state and schemas"
+        fi
+    done
+    rmmod owlbear
+    stop_game
+}
+
 # -------------------------------------------------------------------------
 # Phase 1: BASELINE — no module, cheats should succeed
 # -------------------------------------------------------------------------
@@ -1070,6 +1140,7 @@ main() {
 
     preflight "$@"
 
+    phase_interfaces
     phase_baseline
     phase_protected
     phase_selfprotect

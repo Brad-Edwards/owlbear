@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -23,10 +24,12 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "owlbear_events.h"
+#include "experiment.h"
 #include "bpf_loader.h"
 #include "event_pipeline.h"
 #include "integrity.h"
@@ -58,6 +61,9 @@ struct daemon_config {
 	const char *log_path;
 	const char *device_path;
 	const char *sigs_path;
+	const char *control_path;
+	const char *events_path;
+	unsigned sensors;
 };
 
 /* -------------------------------------------------------------------------
@@ -257,7 +263,7 @@ static void print_event(const struct owlbear_event *ev, FILE *out)
 
 static int open_device(const char *path)
 {
-	int fd = open(path, O_RDONLY);
+	int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 
 	if (fd < 0) {
 		OWL_ERR("failed to open %s: %s", path, strerror(errno));
@@ -267,6 +273,11 @@ static int open_device(const char *path)
 			OWL_ERR("  Try running as root.");
 	}
 
+	if (fd >= 0 && flock(fd, LOCK_EX | LOCK_NB)) {
+		OWL_ERR("device already controlled: %s", strerror(errno));
+		close(fd);
+		return -1;
+	}
 	return fd;
 }
 
@@ -351,7 +362,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 		      struct owl_debugger_detect *dbg_detect,
 		      struct owl_clock_validator *clock_val,
 		      struct owl_vdso_integrity *vdso_integ,
-		      FILE *log_file)
+		      FILE *log_file, struct owl_experiment *experiment)
 {
 	int epfd;
 	struct epoll_event ev;
@@ -391,7 +402,9 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 	OWL_INFO("listening for events (epoll, fds: dev=%d bpf=%d)...",
 		 dev_fd, bpf_fd);
 
+	experiment->loop_ready = true;
 	while (g_running) {
+		if (owl_experiment_poll(experiment, dev_fd)) break;
 		int nfds = epoll_wait(epfd, events, 4, OWL_EPOLL_TIMEOUT_MS);
 
 		if (nfds < 0) {
@@ -537,6 +550,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 				print_event(&me, stdout);
 				if (log_file)
 					print_event(&me, log_file);
+				owl_pipeline_process(pipeline, &me);
 			}
 
 			if (sp_result & 0x04) {
@@ -555,6 +569,7 @@ static int event_loop(int dev_fd, struct owl_bpf_ctx *bpf,
 				print_event(&be, stdout);
 				if (log_file)
 					print_event(&be, log_file);
+				owl_pipeline_process(pipeline, &be);
 			}
 
 			/* TracerPid debugger detection */
@@ -634,6 +649,9 @@ static void print_usage(const char *progname)
 		"  -s, --sigs <path>    Signature file (default: %s)\n"
 		"  -v, --verbose        Verbose output (show debug messages)\n"
 		"  -q, --quiet          Quiet output (errors and warnings only)\n"
+		"      --control <path> Local v1 control socket (private directory)\n"
+		"      --events <path>  Create exclusive v1 JSONL evidence file\n"
+		"      --sensors <set>  BPF groups: all, none, or lsm,trace,kprobe,net\n"
 		"  -h, --help           Show this help\n"
 		"\n"
 		"Example:\n"
@@ -644,6 +662,9 @@ static void print_usage(const char *progname)
 static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 {
 	static const struct option long_opts[] = {
+		{ "control", required_argument, NULL, 1000 },
+		{ "events", required_argument, NULL, 1001 },
+		{ "sensors", required_argument, NULL, 1002 },
 		{ "target",  required_argument, NULL, 't' },
 		{ "enforce", no_argument,       NULL, 'e' },
 		{ "log",     required_argument, NULL, 'l' },
@@ -659,6 +680,9 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 	char *endptr;
 
 	/* Defaults */
+	cfg->control_path = NULL;
+	cfg->events_path = NULL;
+	cfg->sensors = OWL_BPF_ALL;
 	cfg->target_pid = 0;
 	cfg->enforce = false;
 	cfg->log_path = NULL;
@@ -667,10 +691,15 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 
 	while ((opt = getopt_long(argc, argv, "t:el:d:s:vqh", long_opts, NULL)) != -1) {
 		switch (opt) {
+		case 1000: cfg->control_path = optarg; break;
+		case 1001: cfg->events_path = optarg; break;
+		case 1002:
+			if (owl_sensor_mask(optarg, &cfg->sensors)) return -1;
+			break;
 		case 't':
 			errno = 0;
 			pid_val = strtol(optarg, &endptr, 10);
-			if (errno != 0 || *endptr != '\0' || pid_val <= 0) {
+			if (errno != 0 || *endptr != '\0' || pid_val <= 0 || pid_val > INT_MAX) {
 				OWL_ERR("invalid PID: %s", optarg);
 				return -1;
 			}
@@ -703,6 +732,7 @@ static int parse_args(int argc, char *argv[], struct daemon_config *cfg)
 		}
 	}
 
+	if (optind != argc || (cfg->control_path && !cfg->events_path)) return -1;
 	if (cfg->target_pid == 0) {
 		OWL_ERR("--target <pid> is required");
 		print_usage(argv[0]);
@@ -776,6 +806,8 @@ int main(int argc, char *argv[])
 {
 	struct daemon_config cfg;
 	FILE *log_file = NULL;
+	FILE *event_file = NULL;
+	struct owl_experiment experiment = {.socket_fd = -1};
 	int dev_fd = -1;
 	int ret = EXIT_FAILURE;
 
@@ -834,6 +866,18 @@ int main(int argc, char *argv[])
 	owl_pipeline_init(&pipeline, &policy, &sig_db, &ptree, &net_al,
 			  cfg.target_pid, cfg.enforce, log_file);
 
+	if (cfg.events_path) {
+		int fd = open(cfg.events_path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+		if (fd < 0) goto cleanup;
+		event_file = fdopen(fd, "w");
+		if (!event_file) { close(fd); goto cleanup; }
+		pipeline.event_file = event_file;
+	}
+	experiment.pipeline = &pipeline;
+	experiment.requested = cfg.sensors;
+	experiment.enforce = cfg.enforce;
+	if (owl_experiment_open(&experiment, cfg.control_path)) goto cleanup;
+
 	/* Open the kernel device */
 	dev_fd = open_device(cfg.device_path);
 	if (dev_fd < 0)
@@ -854,19 +898,10 @@ int main(int argc, char *argv[])
 		.pipeline = &pipeline,
 		.log_file = log_file,
 	};
-	bpf = owl_bpf_init(bpf_event_callback, &bpf_cb);
+	bpf = owl_bpf_init_selected(bpf_event_callback, &bpf_cb, cfg.sensors, cfg.enforce);
+	experiment.bpf = bpf;
+	experiment.configured = owl_bpf_configure(bpf, cfg.target_pid, getpid()) == 0;
 	if (bpf) {
-		/* Populate BPF maps */
-		if (owl_bpf_protect_pid(bpf, (uint32_t)cfg.target_pid) < 0)
-			OWL_ERR("failed to set protected PID in BPF map");
-
-		/* Whitelist the daemon itself */
-		if (owl_bpf_allow_pid(bpf, (uint32_t)getpid()) < 0)
-			OWL_ERR("failed to whitelist daemon in BPF map");
-
-		/* Whitelist the game process */
-		if (owl_bpf_allow_pid(bpf, (uint32_t)cfg.target_pid) < 0)
-			OWL_ERR("failed to whitelist game in BPF map");
 
 		OWL_INFO("BPF: lsm=%s trace=%s kprobe=%s net=%s",
 			 owl_bpf_has_lsm(bpf) ? "yes" : "no",
@@ -896,6 +931,10 @@ int main(int argc, char *argv[])
 		OWL_WARN("vdso baseline failed (non-fatal)");
 	}
 
+	experiment.integrity_baseline = integrity.baseline_set;
+	experiment.vdso_baseline = vdso_integ.baseline_set;
+	experiment.signatures_loaded = nsigs >= 0;
+
 	OWL_INFO("ready (pid=%d, target=%d, mode=%s)",
 		 getpid(), cfg.target_pid,
 		 cfg.enforce ? "enforce" : "observe");
@@ -903,13 +942,19 @@ int main(int argc, char *argv[])
 	/* Run the event loop */
 	ret = event_loop(dev_fd, bpf, &pipeline, &integrity, &selfprot,
 			 &dbg_detect, &clock_val, &vdso_integ,
-			 log_file) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+			 log_file, &experiment) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 
 	OWL_INFO("shutting down (events=%u, blocks=%u, kills=%u, sigs=%u)",
 		 pipeline.events_processed, pipeline.actions_block,
 		 pipeline.actions_kill, pipeline.sig_matches);
 
 cleanup:
+	owl_experiment_close(&experiment);
+	if (dev_fd >= 0) {
+		ioctl(dev_fd, OWL_IOC_CLEAR_TARGET);
+		set_enforce_mode(dev_fd, false);
+	}
+	if (event_file && fclose(event_file)) ret = EXIT_FAILURE;
 	owl_ptree_destroy(&ptree);
 	if (bpf)
 		owl_bpf_destroy(bpf);

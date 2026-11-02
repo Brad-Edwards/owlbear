@@ -16,6 +16,8 @@
 
 #include "owlbear_common.bpf.h"
 
+const volatile bool enforce_mode = true;
+
 /* -------------------------------------------------------------------------
  * LSM: ptrace_access_check
  *
@@ -36,9 +38,9 @@ int BPF_PROG(owl_ptrace_check, struct task_struct *child, unsigned int mode)
 		return 0;
 
 	emit_event(OWL_EVENT_PTRACE_ATTEMPT, OWL_SEV_CRITICAL,
-		   caller_pid, child_pid, "BPF LSM: ptrace blocked");
+		   caller_pid, child_pid, "BPF LSM: ptrace attempt");
 
-	return -EPERM;
+	return enforce_mode ? -EPERM : 0;
 }
 
 /* -------------------------------------------------------------------------
@@ -101,9 +103,9 @@ int BPF_PROG(owl_file_open, struct file *file)
 		caller_pid = bpf_get_current_pid_tgid() >> 32;
 		emit_event(OWL_EVENT_DEV_MEM_ACCESS, OWL_SEV_CRITICAL,
 			   caller_pid, 0,
-			   is_kmem ? "BPF LSM: /dev/kmem blocked"
-				   : "BPF LSM: /dev/mem blocked");
-		return -EPERM;
+			   is_kmem ? "BPF LSM: /dev/kmem access"
+				   : "BPF LSM: /dev/mem access");
+		return enforce_mode ? -EPERM : 0;
 	}
 
 	/* Only "mem" is relevant under /proc; kmem handled above */
@@ -153,9 +155,9 @@ int BPF_PROG(owl_file_open, struct file *file)
 
 	emit_event(OWL_EVENT_PROC_MEM_ACCESS, OWL_SEV_CRITICAL,
 		   caller_pid, target_pid,
-		   "BPF LSM: /proc/pid/mem blocked");
+		   "BPF LSM: /proc/pid/mem access");
 
-	return -EPERM;
+	return enforce_mode ? -EPERM : 0;
 }
 
 /* -------------------------------------------------------------------------

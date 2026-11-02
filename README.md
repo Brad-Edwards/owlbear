@@ -86,6 +86,8 @@ sudo scripts/verify.sh
 
 Same plumbing. Kprobes + eBPF LSM is how CrowdStrike, SentinelOne, and Cilium Tetragon work. Anti-cheat protects one process from everything else. EDR protects the system from specific threats. This prototype sits in the overlap.
 
+Experiment controllers: [versioned control and telemetry interfaces](docs/experiment-interface.md).
+
 ## Docs
 
 [GitHub Pages site](https://brad-edwards.github.io/owlbear/)

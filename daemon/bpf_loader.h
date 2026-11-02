@@ -12,6 +12,7 @@
 #define OWLBEAR_BPF_LOADER_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "owlbear_events.h"
@@ -33,6 +34,12 @@ typedef void (*owl_bpf_event_cb)(const struct owlbear_event *ev, void *ctx);
  * Returns a BPF context on success (even partial — check has_* flags).
  * Returns NULL only on fatal allocation failure.
  */
+#define OWL_BPF_ALL 15u
+struct owl_bpf_ctx *owl_bpf_init_selected(owl_bpf_event_cb cb, void *cb_ctx,
+                                          unsigned sensors, bool enforce);
+int owl_bpf_configure(struct owl_bpf_ctx *ctx, uint32_t target, uint32_t daemon_pid);
+unsigned owl_bpf_attached(const struct owl_bpf_ctx *ctx);
+
 struct owl_bpf_ctx *owl_bpf_init(owl_bpf_event_cb cb, void *cb_ctx);
 
 /**

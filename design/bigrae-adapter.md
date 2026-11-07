@@ -87,4 +87,5 @@ An exec within the same process retains that identity; code-integrity evidence r
 
 BPF exec records encode parent PID, UID, and a bounded executable path.
 The userspace converter maps those fields to the shared process payload.
+The production daemon and converter tests link the same `bpf_event_convert.c` implementation.
 Text descriptions must not be interpreted as numeric process identity.

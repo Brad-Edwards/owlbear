@@ -19,6 +19,7 @@ DEPFLAGS  = -MMD -MP -MF $(@:.o=.d)
 SRCS     := main.c \
             experiment.c \
             bpf_loader.c \
+            bpf_event_convert.c \
             event_pipeline.c \
             process_tree.c \
             sig_loader.c \

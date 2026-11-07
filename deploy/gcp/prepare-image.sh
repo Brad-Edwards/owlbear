@@ -51,5 +51,5 @@ install -d -m 0755 /opt/owlbear/qualification
 install -m 0644 qualification/bigrae/check-memory.py qualification/bigrae/baseline.py /opt/owlbear/qualification/
 install -m 0644 deploy/gcp/owlbear-qualification-baseline.service deploy/gcp/owlbear-qualification-target.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable owlbear-qualification-target.service
-printf '%s\n' 'Image prepared. Reboot, verify the kernel and active BPF LSM, then capture the stopped guest.'
+printf '%s\n' 'Image prepared. Reboot and verify the kernel and active BPF LSM.'
+printf '%s\n' 'Follow README.md to enable the workload without starting it before image capture.'

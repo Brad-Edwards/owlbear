@@ -9,7 +9,7 @@ It never fetches releases, creates infrastructure, or accesses cloud credentials
 Flow: RuntimeInput -> closed configuration -> bounded GuestAction -> existing
 artifact verifier, module loader, daemon CLI -> control socket readback.
 Verification checks artifact identity and bytes, running kernel/architecture,
-loaded module GNU build note, daemon executable and runtime readback. Only guest
+loaded module GNU build note, authenticated daemon build and runtime readback. Only guest
 execution exit status proves readiness; a planned action does not.
 
 Each operation has its own private /run/owlbear-<operation UUID> directory.

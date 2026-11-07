@@ -157,6 +157,9 @@ The selected implementation uses a disposable C4A ARM64 guest and the existing G
 The operator has authorized test deployment and isolated worktrees across the affected repositories.
 GCP image preparation builds Owlbear for the selected kernel; the earlier generic kernel does not constrain this build.
 The caller owns the workload PID file and baseline/protected checks.
+Workload readiness requires its complete newline-terminated PID/address record.
+The builder leaves qualification services disabled until the final image capture step.
+Each cloned guest creates fresh baseline evidence; builder trial state must be removed before capture.
 Adapter 0.2.0 binds the realized PID to its process start time before configuration.
 The worker image uses the control-plane CPU architecture independently of the ARM64 guest.
 BigRAE's administrator image binding selects gVNIC, NVMe, Hyperdisk, and the guest module-loading policy.

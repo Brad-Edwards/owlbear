@@ -1,0 +1,9 @@
+name: owlbear-arm64-qualification
+title: Owlbear ARM64 Qualification
+version: 0.1.0
+status: draft
+description: Disposable synthetic ARM64 guest for independent runtime adapter qualification.
+authors:
+  - Owlbear maintainers
+provenance_ledger: docs/provenance-ledger.yaml
+associated_artifact_manifest: associated-artifacts.json

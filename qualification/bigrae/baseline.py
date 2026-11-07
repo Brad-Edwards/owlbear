@@ -9,6 +9,26 @@ import subprocess
 import time
 
 
+def wait_for_workload(process, info, timeout=10):
+    """Wait for the game's complete newline-terminated discovery record."""
+    deadline = time.monotonic() + timeout
+    while process.poll() is None and time.monotonic() < deadline:
+        try:
+            record = info.read_text()
+        except FileNotFoundError:
+            record = ""
+        if record.endswith("\n"):
+            fields = record.split()
+            if len(fields) != 2 or int(fields[0]) != process.pid:
+                raise RuntimeError("baseline workload identity mismatch")
+            address = int(fields[1], 0)
+            if address <= 0:
+                raise RuntimeError("invalid baseline workload address")
+            return address
+        time.sleep(.05)
+    raise RuntimeError("baseline workload did not become ready")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", type=Path, required=True)
@@ -26,15 +46,8 @@ def main():
     with (args.output.parent / "baseline-game.log").open("x") as log:
         process = subprocess.Popen([str(args.release / "game/owlbear-game"), "--no-curses"], stdout=log, stderr=log)
         try:
-            deadline = time.monotonic() + 10
-            while not info.exists():
-                if process.poll() is not None or time.monotonic() >= deadline:
-                    raise RuntimeError("baseline workload did not become ready")
-                time.sleep(.05)
-            fields = info.read_text().split()
-            if int(fields[0]) != process.pid:
-                raise RuntimeError("baseline workload identity mismatch")
-            results = checks.check(process.pid, int(fields[1], 0))
+            address = wait_for_workload(process, info)
+            results = checks.check(process.pid, address)
             passed = checks.classify(results, "baseline")
             receipt = {"schema": "owlbear.qualification.memory/v1", "phase": "baseline",
                        "target_pid": process.pid, "results": results, "passed": passed}

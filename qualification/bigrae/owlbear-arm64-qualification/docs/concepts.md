@@ -1,7 +1,8 @@
 # Qualification guest
 
 This pack declares one disposable Linux virtual machine and its private network.
-BigRAE administration binds `nodes.guest` to the selected ARM64 image and hardware profile.
+BigRAE administration maps the adapter's `guest` binding to the compiled guest address shown in pack details.
+That binding selects the ARM64 image and hardware profile.
 The pack contains no credentials, executable attacks, or study data.
 
 The image starts a caller-owned baseline before starting the protected target.

@@ -1,7 +1,7 @@
 {
   "schema_version": "associated-artifact-manifest/v1",
   "manifest_id": "owlbear-arm64-qualification-associated-artifacts",
-  "manifest_version": "0.1.0",
+  "manifest_version": "0.1.1",
   "canonicalization_profile": "associated-artifact-set/v1",
   "scope": "scenario",
   "parent_ref": {
@@ -35,9 +35,9 @@
       "uri": "raes-environment-pack:/docs/concepts.md",
       "checksum": {
         "algorithm": "sha256",
-        "value": "e19bd25045d07441c6307407ff7d3747b7dd53f600bd72ecf187a7fd72fa66eb"
+        "value": "e9141fa778b98f910be70d2fbefc309267439de937fc646d27e99acc8bef182f"
       },
-      "size_bytes": 604,
+      "size_bytes": 681,
       "created_at": "2026-11-07T00:00:00Z",
       "source": "owlbear",
       "satisfies_refs": [],
@@ -67,7 +67,7 @@
       "uri": "raes-environment-pack:/pack.yaml",
       "checksum": {
         "algorithm": "sha256",
-        "value": "248bdb8cf8f292ddee6d4a7307def5a3a4d12532dc10049221e4473680dec875"
+        "value": "9e3be5bfe075f28afc1f3a94495517820353cf8f643b2ffe6259bb03ebecf6d0"
       },
       "size_bytes": 327,
       "created_at": "2026-11-07T00:00:00Z",
@@ -93,5 +93,5 @@
       "description": null
     }
   },
-  "set_digest": "sha256:f626dcc9cc69455252451b7e4a5106600e1864897136be5009932cec8dfc7403"
+  "set_digest": "sha256:f495a76b3ddcb2e83fd168794bb8c36827772a72b2d7f925434d71ec8399007a"
 }

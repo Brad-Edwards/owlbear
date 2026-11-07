@@ -17,7 +17,7 @@ workflow:
     subject_pattern: '^[a-z].*$'
 
 docs:
-  architecture_overview: docs/architecture/overview.md
+  architecture_overview: README.md
 
 example_paths:
   source: daemon/
@@ -26,7 +26,7 @@ example_paths:
 cross_cutting_concerns:
   description: |
     Runtime: ARM64 Linux kernel module, eBPF programs, and C userspace daemon; Python AWS telemetry receiver and independent BigRAE runtime adapter.
-    Interfaces: shared event and ioctl definitions in include/owlbear_events.h; versioned control and telemetry contracts in docs/experiment-interface.md.
+    Interfaces: shared event and ioctl definitions in include/owlbear_events.h; versioned control and telemetry contracts in design/experiment-interface.md.
     Logging: daemon/log.h; preserve versioned experiment output and evidence identities.
     Tests: C unit binaries under tests/, Python unittest modules for experiment interfaces and research artifacts, and separately installed SDK/adapter tests under adapters/bigrae/tests/.
     Verification: run targeted checks locally; CI owns full suites, ARM64 builds, Terraform validation, artifact reproducibility, and worker integration. Live runtime qualification needs an authorized disposable ARM64 range.

@@ -24,6 +24,9 @@ jobs:
       - name: Experiment interface integration tests
         run: python3 -m unittest discover -s tests -p test_experiment.py -v
 
+      - name: Qualification caller tests
+        run: python3 -m unittest discover -s tests -p 'test_qualification_*.py' -v
+
       - name: Check shared header compiles
         run: |
           gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \

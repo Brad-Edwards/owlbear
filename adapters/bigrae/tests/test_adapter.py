@@ -147,11 +147,12 @@ class AdapterTests(unittest.TestCase):
             path = tmp + "/control.sock"
             with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as server:
                 server.bind(path)
-                server.listen(2)
+                server.listen(3)
                 server.settimeout(3)
                 received = []
                 def serve():
-                    for reply in (json.dumps(dict(ready(), pid=os.getpid())).encode(), b"x" * 9000):
+                    for reply in (json.dumps(dict(ready(), pid=os.getpid())).encode(), b"x" * 9000,
+                                  json.dumps(dict(ready(), pid=os.getpid() + 1)).encode()):
                         connection, _ = server.accept()
                         with connection:
                             connection.settimeout(3)
@@ -162,6 +163,8 @@ class AdapterTests(unittest.TestCase):
                 self.assertEqual(health(path), dict(ready(), pid=os.getpid()))
                 with self.assertRaises(ValueError):
                     health(path)
+                with self.assertRaises(ValueError):
+                    health(path)
                 thread.join(timeout=4)
                 self.assertFalse(thread.is_alive())
-                self.assertEqual(received, [b"owlbear.control.v1 health"] * 2)
+                self.assertEqual(received, [b"owlbear.control.v1 health"] * 3)

@@ -1,6 +1,6 @@
 # Owlbear BigRAE runtime adapter
 
-Independent wheel `owlbear-bigrae-adapter==0.1.0`, entry point `owlbear` in
+Independent wheel `owlbear-bigrae-adapter==0.2.0`, entry point `owlbear` in
 `bigrae.runtime.plugins`, using `bigrae-adapter-sdk[runtime]==0.1.0`.
 The worker returns SDK plans; BigRAE authorizes targets and executes guest actions.
 An installation inspection or successful plan does not prove guest readiness.
@@ -94,7 +94,12 @@ or transfers. All release files and ancestors must be root-owned and not writabl
 by others. Use a trusted manifest hash from the intended release. The guest needs
 ARM64 Linux, the exact kernel, matching libraries, Python 3, kmod (`insmod`),
 binutils (`readelf`) and root guest execution. The isolated worker remains unprivileged.
-The caller starts and owns the target process. No attack or game behavior is built
+The caller starts and owns the target process.
+For a newly realized guest, `target_pid` can instead be a canonical PID-file path
+such as `/run/owlbear-qualification/target.pid`. The file and its ancestors must
+be root-owned and not writable by other users. The adapter reads a bounded
+integer and records the process executable and start time. Retry and verification
+refuse a changed process identity, including PID reuse. No attack or game behavior is built
 in. Empty `sensors` disables BPF groups; kernel and daemon checks remain active.
 Parameters are encoded as JSON data, never interpolated into shell commands.
 

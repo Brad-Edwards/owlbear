@@ -41,3 +41,36 @@ fixture. Only the guest test has private writable fake sysfs and a fake module
 loader. It never mounts host sysfs or loads a real module. Configure, retry,
 verify and negative readbacks execute complete SDK-generated guest scripts.
 The guest fixture cannot enter the worker image or runtime package.
+
+Live range qualification follows the separate
+[qualification boundary](bigrae-qualification.md); integration receipts do not
+establish live readiness, attack outcomes or range teardown.
+
+## Newly realized guest targets
+
+Adapter version 0.2.0 retains explicit integer PIDs and accepts a canonical PID-file path under `/run`.
+The caller creates the file and starts the workload before the configure action.
+The adapter does not start or select a workload.
+It requires a root-owned regular file and root-owned ancestors without group or other write permission.
+It refuses symlinks, oversized files, malformed numbers, and PIDs below two.
+Configure records the target PID, executable, and process start time in the private operation directory.
+Retry and verify require the same process identity.
+The readiness receipt continues to report the realized integer PID.
+
+```mermaid
+flowchart LR
+    Caller[Qualification caller] -->|Starts workload| Target[Guest target process]
+    Caller -->|Root-owned PID file| Run[(Private guest runtime files)]
+    Config[Pinned adapter configuration] -->|PID or canonical PID-file path| Action[Guest action]
+    Run -->|Bounded PID| Action
+    Target -->|Kernel process identity| Action
+    Action -->|Exact target binding| Daemon[Existing daemon and module]
+    Daemon -->|Health and build identity| Receipt[Existing readiness receipt]
+```
+
+The file is caller-controlled input across the guest-action boundary.
+Exclusive state creation binds retries to the original process and detects PID reuse.
+Existing health, release, and loaded-module checks remain mandatory.
+Target identity tests cover file safety and changed-process rejection.
+The GCP image procedure is in `deploy/gcp/README.md`.
+Provider-specific image recipes stay outside the runtime adapter.

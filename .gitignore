@@ -80,6 +80,10 @@ platform/api/*.zip
 *.pid
 core
 
+# Local credentials and environment settings
+.env
+.env.*
+
 # --- Executables (generic) ---
 *.exe
 *.out

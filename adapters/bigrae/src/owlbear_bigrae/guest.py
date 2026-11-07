@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import socket
 import stat
 import struct
@@ -93,9 +94,60 @@ def verify_health(state, config):
     return state
 
 
+def resolve_target(value):
+    if type(value) is int:
+        return value
+    path = Path(value)
+    for item in (path, *path.parents):
+        info = item.lstat()
+        if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError("target PID file and ancestors must be root-owned and not writable by others")
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_size > 32:
+            raise ValueError("invalid target PID file")
+        raw = os.read(fd, 33)
+    finally:
+        os.close(fd)
+    if not re.fullmatch(rb"[1-9][0-9]{0,9}\n?", raw):
+        raise ValueError("invalid target PID file contents")
+    pid = int(raw)
+    if not 1 < pid <= 2147483647:
+        raise ValueError("invalid target PID")
+    return pid
+
+
+def target_identity(pid):
+    process = Path(f"/proc/{pid}")
+    raw = (process / "stat").read_text()
+    fields = raw[raw.rindex(")") + 2:].split()
+    return {"pid": pid, "start_time_ticks": int(fields[19]), "executable": str((process / "exe").resolve(strict=True))}
+
+
+def bind_target(run_dir, pid, configured):
+    current = target_identity(pid)
+    path = run_dir / "target.json"
+    if configured and not path.exists():
+        with path.open("x") as stream:
+            json.dump(current, stream, sort_keys=True)
+    if json.loads(path.read_text()) != current:
+        raise ValueError("target process identity changed")
+    return current
+
+
 def execute(payload):
-    config = payload["configuration"]
+    config = dict(payload["configuration"])
     root, identity = release_identity(config)
+    deadline = time.monotonic() + 15
+    while True:
+        try:
+            config["target_pid"] = resolve_target(config["target_pid"])
+            break
+        except FileNotFoundError:
+            if payload["phase"] != "configure" or time.monotonic() >= deadline:
+                raise
+            time.sleep(.25)
     run_dir = Path("/run/owlbear-" + payload["operation"])
     configured = payload["phase"] == "configure"
     if configured:
@@ -103,6 +155,7 @@ def execute(payload):
     permissions = run_dir.lstat()
     if not stat.S_ISDIR(permissions.st_mode) or permissions.st_uid != 0 or stat.S_IMODE(permissions.st_mode) != 0o700:
         raise ValueError("private root-owned runtime directory required")
+    target = bind_target(run_dir, config["target_pid"], configured)
     control = run_dir / "control.sock"
     if configured and not control.exists():
         if Path("/sys/module/owlbear").exists():
@@ -128,7 +181,9 @@ def execute(payload):
             if time.monotonic() >= deadline:
                 raise
             time.sleep(.25)
-    receipt = {"schema": "owlbear.bigrae.readiness/v1", "build": identity, "health": state}
+    receipt = {"schema": "owlbear.bigrae.readiness/v1", "build": identity, "health": state, "target": target}
+    if target_identity(config["target_pid"]) != target:
+        raise ValueError("target process changed during configuration")
     print(json.dumps(receipt, separators=(",", ":")))
 
 

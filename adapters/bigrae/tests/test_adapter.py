@@ -1,6 +1,7 @@
 """Installed-wheel tests; subprocess worker tests are local integration tests."""
 import json
 import os
+from pathlib import Path
 import subprocess
 import socket
 import struct
@@ -12,7 +13,7 @@ from uuid import uuid4
 
 from bigrae_adapter_sdk.runtime import RuntimeInput, parse_input, parse_result
 from owlbear_bigrae import configuration, factory, manifest
-from owlbear_bigrae.guest import verify_health, module_note_id, health
+from owlbear_bigrae.guest import verify_health, module_note_id, health, bind_target, target_identity
 
 IMAGE = "registry.example.org/owlbear/worker@sha256:" + "a" * 64
 CONFIG = dict(release="/opt/owlbear/releases/release-1", manifest_sha256="b" * 64,
@@ -37,6 +38,28 @@ def ready():
 
 
 class AdapterTests(unittest.TestCase):
+    def test_caller_pid_file_is_a_closed_configuration_choice(self):
+        config = dict(CONFIG, target_pid="/run/owlbear-qualification/target.pid")
+        self.assertEqual(configuration(json.dumps(config)), config)
+        for path in ("/tmp/target.pid", "/run/../tmp/target.pid", "/run/./target.pid",
+                     "/run//target.pid", "/run/target", "/run/target.pid\n"):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                configuration(json.dumps(dict(CONFIG, target_pid=path)))
+
+    def test_target_binding_rejects_changed_process_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pid = os.getpid()
+            original = bind_target(root, pid, True)
+            self.assertEqual(bind_target(root, pid, False), original)
+            self.assertEqual(original, target_identity(pid))
+            changed = dict(original, start_time_ticks=original["start_time_ticks"] + 1)
+            (root / "target.json").write_text(json.dumps(changed))
+            with self.assertRaises(ValueError):
+                bind_target(root, pid, True)
+            with self.assertRaises(ValueError):
+                bind_target(root, pid, False)
+
     def test_plans_bind_to_request_and_only_declared_guest(self):
         for phase in ("validate", "configure", "verify", "cleanup"):
             with self.subTest(phase=phase):

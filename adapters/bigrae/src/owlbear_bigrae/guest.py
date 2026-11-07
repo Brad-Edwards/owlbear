@@ -65,11 +65,15 @@ def health(path):
     with socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET) as client:
         client.settimeout(2)
         client.connect(str(path))
+        peer_pid, peer_uid, _ = struct.unpack("3i", client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
         client.sendall(b"owlbear.control.v1 health")
         raw, _, flags, _ = client.recvmsg(8192)
         if flags & socket.MSG_TRUNC:
             raise ValueError("oversized health reply")
-        return json.loads(raw)
+        result = json.loads(raw)
+        if peer_uid != os.geteuid() or result.get("pid") != peer_pid:
+            raise ValueError("control socket peer identity mismatch")
+        return result
 
 
 def verify_health(state, config):
@@ -122,7 +126,8 @@ def target_identity(pid):
     process = Path(f"/proc/{pid}")
     raw = (process / "stat").read_text()
     fields = raw[raw.rindex(")") + 2:].split()
-    return {"pid": pid, "start_time_ticks": int(fields[19]), "executable": str((process / "exe").resolve(strict=True))}
+    # The process start time remains readable after ptrace protection is active.
+    return {"pid": pid, "start_time_ticks": int(fields[19])}
 
 
 def bind_target(run_dir, pid, configured):
@@ -174,8 +179,10 @@ def execute(payload):
     while True:
         try:
             state = verify_health(health(control), config)
-            if Path(f"/proc/{state['pid']}/exe").resolve(strict=True) != root / "daemon/owlbeard":
-                raise ValueError("running daemon identity mismatch")
+            # Self-protection denies external /proc/<daemon>/exe readback.
+            # Authenticate the private control peer and its own compiled identity.
+            if state.get("build") != identity:
+                raise ValueError("running daemon build identity mismatch")
             break
         except (OSError, ValueError):
             if time.monotonic() >= deadline:

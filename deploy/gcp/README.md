@@ -24,3 +24,11 @@ The runtime adapter selects `/opt/owlbear/releases/qualification` and never down
 describes provider requirements.
 [Canonical kernel guidance](https://ubuntu.com/gcp/docs/google-how-to/gce/arm64-on-google-cloud/)
 describes GCP kernel variants.
+
+The caller-owned systemd units run a fresh baseline target before the protected target.
+The baseline target exits before the protected target starts.
+The PID file names the protected target and is available only to root.
+The memory checker records syscall return values and errno independently of daemon events.
+Baseline requires successful reads, writes, and ptrace attachment.
+Protected checks require EPERM for every selected operation; other errors fail qualification.
+Retain health and flush receipts before stopping the daemon and destroying the range.

@@ -10,6 +10,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include "experiment.h"
+#include "owlbear_build.h"
 
 int owl_sensor_mask(const char *text, unsigned *mask)
 {
@@ -104,7 +105,7 @@ int owl_experiment_poll(struct owl_experiment *exp, int dev_fd)
 		status.target_pid == (unsigned)pipe->target_pid &&
 		status.enforce_mode == exp->enforce && attached == exp->requested &&
 		kill(pipe->target_pid, 0) == 0 && pipe->event_file && !ferror(pipe->event_file);
-	char reply[1400];
+	char reply[2048];
 	int len = snprintf(reply, sizeof(reply),
 		"{\"schema\":\"owlbear.control.v1\",\"ok\":%s,\"ready\":%s,"
 		"\"pid\":%d,\"target_pid\":%d,\"epoch\":%u,"
@@ -113,7 +114,7 @@ int owl_experiment_poll(struct owl_experiment *exp, int dev_fd)
 		"\"requested_enforce\":%s,\"lsm_enforce\":%s,\"events_processed\":%u,"
 		"\"kernel_dropped\":%u,\"bpf_dropped\":null,\"evidence_loss_known\":%s,"
 		"\"code_integrity_baseline\":%s,\"vdso_baseline\":%s,\"signatures_loaded\":%s,"
-		"\"bpf_delivery\":%s,\"output_failed\":%s}\n",
+		"\"bpf_delivery\":%s,\"output_failed\":%s,\"build\":" OWL_BUILD_INFO_JSON "}\n",
 		success ? "true":"false", ready ? "true":"false", getpid(), pipe->target_pid,
 		pipe->epoch, exp->requested, attached, exp->configured ? "true":"false",
 		kmod ? "true":"false", status.target_pid, status.enforce_mode ? "true":"false",

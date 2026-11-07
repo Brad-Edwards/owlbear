@@ -151,7 +151,7 @@ class AdapterTests(unittest.TestCase):
                 server.settimeout(3)
                 received = []
                 def serve():
-                    for reply in (json.dumps(ready()).encode(), b"x" * 9000):
+                    for reply in (json.dumps(dict(ready(), pid=os.getpid())).encode(), b"x" * 9000):
                         connection, _ = server.accept()
                         with connection:
                             connection.settimeout(3)
@@ -159,7 +159,7 @@ class AdapterTests(unittest.TestCase):
                             connection.sendall(reply)
                 thread = threading.Thread(target=serve, daemon=True)
                 thread.start()
-                self.assertEqual(health(path), ready())
+                self.assertEqual(health(path), dict(ready(), pid=os.getpid()))
                 with self.assertRaises(ValueError):
                     health(path)
                 thread.join(timeout=4)

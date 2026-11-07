@@ -77,6 +77,8 @@ class ExperimentIntegration(unittest.TestCase):
 
     def test_lifecycle_reset_and_durable_events(self):
         state = self.start(enforce=True)
+        embedded = json.loads(subprocess.check_output([str(self.binary), "--version"], text=True))
+        self.assertEqual(state["build"], embedded)
         self.assertTrue(state["ready"])
         self.assertTrue(state["kernel_enforce"])
         self.assertTrue(state["evidence_loss_known"])

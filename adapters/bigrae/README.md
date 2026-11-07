@@ -98,7 +98,7 @@ The caller starts and owns the target process.
 For a newly realized guest, `target_pid` can instead be a canonical PID-file path
 such as `/run/owlbear-qualification/target.pid`. The file and its ancestors must
 be root-owned and not writable by other users. The adapter reads a bounded
-integer and records the process executable and start time. Retry and verification
+integer and records the process start time. Retry and verification
 refuse a changed process identity, including PID reuse. No attack or game behavior is built
 in. Empty `sensors` disables BPF groups; kernel and daemon checks remain active.
 Parameters are encoded as JSON data, never interpolated into shell commands.
@@ -116,7 +116,9 @@ the selected ELF. Guests without readable module build notes fail explicitly.
 timeout and bounded output. It checks realized PID, attachments and enforcement,
 all three daemon initialization results (signature loading, code-integrity and vDSO
 baselines), output health and zero known kernel drops. Unknown BPF loss remains
-unknown. The running daemon executable must resolve to the selected release.
+unknown. The private control socket authenticates its PID and UID with SO_PEERCRED.
+Health reports the daemon’s embedded build identity, which must match the release.
+External `/proc/<daemon>/exe` inspection is denied by active self-protection.
 Readiness polling has a 15-second deadline; guest actions have a 120-second host
 limit and subprocess deadlines. Successful execution prints
 `owlbear.bigrae.readiness/v1` with the build identity and actual health response.

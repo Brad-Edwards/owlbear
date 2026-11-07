@@ -53,7 +53,7 @@ The caller creates the file and starts the workload before the configure action.
 The adapter does not start or select a workload.
 It requires a root-owned regular file and root-owned ancestors without group or other write permission.
 It refuses symlinks, oversized files, malformed numbers, and PIDs below two.
-Configure records the target PID, executable, and process start time in the private operation directory.
+Configure records the target PID and process start time in the private operation directory.
 Retry and verify require the same process identity.
 The readiness receipt continues to report the realized integer PID.
 
@@ -74,3 +74,17 @@ Existing health, release, and loaded-module checks remain mandatory.
 Target identity tests cover file safety and changed-process rejection.
 The GCP image procedure is in `deploy/gcp/README.md`.
 Provider-specific image recipes stay outside the runtime adapter.
+
+## Protected identity readback
+
+The private control socket authenticates its peer with Linux SO_PEERCRED.
+The reported PID must match that peer and its UID must match the root caller.
+Health includes the daemon's compiled `owlbear.build/v1` identity.
+The adapter compares that identity with the verified release manifest.
+This replaces external executable-symlink inspection, which active ptrace protection denies.
+Target retries compare PID and kernel process start time, which remains readable under protection.
+An exec within the same process retains that identity; code-integrity evidence remains a separate claim.
+
+BPF exec records encode parent PID, UID, and a bounded executable path.
+The userspace converter maps those fields to the shared process payload.
+Text descriptions must not be interpreted as numeric process identity.

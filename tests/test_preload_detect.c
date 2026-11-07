@@ -7,11 +7,20 @@
  */
 
 #include <string.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "test_harness.h"
 #include "preload_detect.h"
+
+static int backoffs;
+int __wrap_usleep(useconds_t duration)
+{
+	(void)duration;
+	backoffs++;
+	return 0;
+}
 
 /* -------------------------------------------------------------------------
  * Pure function: owl_scan_environ_for_preload
@@ -61,6 +70,16 @@ TEST(check_preload_self) {
 	ASSERT_EQ(ret, 0);
 }
 
+TEST(exited_process_does_not_back_off) {
+	pid_t child = fork();
+	ASSERT_TRUE(child >= 0);
+	if (child == 0) _exit(0);
+	ASSERT_EQ(waitpid(child, NULL, 0), child);
+	backoffs = 0;
+	ASSERT_EQ(owl_check_preload_env(child, NULL, 0), -1);
+	ASSERT_EQ(backoffs, 0);
+}
+
 /* -------------------------------------------------------------------------
  * Runner
  * ----------------------------------------------------------------------- */
@@ -74,6 +93,7 @@ int main(void)
 	RUN_TEST(scan_null_buffer_returns_error);
 	RUN_TEST(scan_preload_null_output);
 	RUN_TEST(check_preload_self);
+	RUN_TEST(exited_process_does_not_back_off);
 
 	TEST_SUMMARY();
 	return test_failures;

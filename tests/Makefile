@@ -84,7 +84,7 @@ test_debugger_detect: test_harness.o test_debugger_detect.o $(DAEMON_DIR)/debugg
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_preload_detect: test_harness.o test_preload_detect.o $(DAEMON_DIR)/preload_detect.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -Wl,--wrap=usleep
 
 test_process_tree: test_harness.o test_process_tree.o $(DAEMON_DIR)/process_tree.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)

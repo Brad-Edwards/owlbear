@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Caller-owned baseline on a fresh benign target, before protection starts."""
 import argparse
-import importlib.util
-import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 
 
@@ -39,30 +38,32 @@ def main():
         parser.error("an unprotected disposable guest without stale workload state is required")
     if args.output.exists() or args.output.is_symlink():
         parser.error("baseline evidence already exists")
-    spec = importlib.util.spec_from_file_location("memory_checks", Path(__file__).with_name("check-memory.py"))
-    checks = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(checks)
     args.output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    pid_file = args.output.with_suffix(".target.pid")
+    created_pid_file = False
     with (args.output.parent / "baseline-game.log").open("x") as log:
         process = subprocess.Popen([str(args.release / "game/owlbear-game"), "--no-curses"], stdout=log, stderr=log)
         try:
             address = wait_for_workload(process, info)
-            results = checks.check(process.pid, address)
-            passed = checks.classify(results, "baseline")
-            receipt = {"schema": "owlbear.qualification.memory/v1", "phase": "baseline",
-                       "target_pid": process.pid, "results": results, "passed": passed}
-            descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            if address <= 0:
+                raise RuntimeError("invalid baseline workload address")
+            descriptor = os.open(pid_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            created_pid_file = True
             with os.fdopen(descriptor, "w") as stream:
-                json.dump(receipt, stream, sort_keys=True)
-                stream.write("\n")
-            print(json.dumps(receipt, sort_keys=True))
+                stream.write(str(process.pid) + "\n")
+            # The checker must not gain a parent-of-target exception from Yama.
+            result = subprocess.run([sys.executable, str(Path(__file__).with_name("check-memory.py")),
+                                     "--phase", "baseline", "--pid-file", str(pid_file),
+                                     "--output", str(args.output)], timeout=20, check=False)
         finally:
             if process.poll() is None:
                 process.terminate()
             process.wait(timeout=10)
+            if created_pid_file:
+                pid_file.unlink()
     if info.exists() or info.is_symlink():
         raise RuntimeError("baseline workload did not remove its discovery file")
-    return 0 if passed else 1
+    return result.returncode
 
 
 if __name__ == "__main__":

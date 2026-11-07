@@ -157,6 +157,8 @@ The selected implementation uses a disposable C4A ARM64 guest and the existing G
 The operator has authorized test deployment and isolated worktrees across the affected repositories.
 GCP image preparation builds Owlbear for the selected kernel; the earlier generic kernel does not constrain this build.
 The caller owns the workload PID file and baseline/protected checks.
+Both check processes run outside the target's ancestry under the same root authority.
+The baseline caller launches the existing checker as a separate process, preserving Yama's process-relationship boundary.
 Workload readiness requires its complete newline-terminated PID/address record.
 The builder leaves qualification services disabled until the final image capture step.
 Each cloned guest creates fresh baseline evidence; builder trial state must be removed before capture.

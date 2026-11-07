@@ -1,6 +1,6 @@
 # Owlbear BigRAE runtime adapter
 
-Independent wheel `owlbear-bigrae-adapter==0.2.0`, entry point `owlbear` in
+Independent wheel `owlbear-bigrae-adapter==0.2.1`, entry point `owlbear` in
 `bigrae.runtime.plugins`, using `bigrae-adapter-sdk[runtime]==0.1.0`.
 The worker returns SDK plans; BigRAE authorizes targets and executes guest actions.
 An installation inspection or successful plan does not prove guest readiness.

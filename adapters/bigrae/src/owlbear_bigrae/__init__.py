@@ -9,7 +9,7 @@ import re
 from bigrae_adapter_sdk.runtime import GuestAction, PluginManifest, RuntimePlan, decode_message
 
 PARAMETERS = ["configuration"]
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 def configuration(raw):

@@ -46,3 +46,6 @@ The memory checker records syscall return values and errno independently of daem
 Baseline requires successful reads, writes, and ptrace attachment.
 Protected checks require EPERM for every selected operation; other errors fail qualification.
 Retain health and flush receipts before stopping the daemon and destroying the range.
+
+The [BigRAE GCP qualification record](../../qualification/bigrae/records/2026-11-07-gcp-bigrae.md)
+lists the tested image hardware, pinned builds, observed results, and verified teardown.

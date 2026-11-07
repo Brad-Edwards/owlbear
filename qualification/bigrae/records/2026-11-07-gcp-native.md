@@ -1,7 +1,7 @@
 # Native GCP compatibility check
 
 The native compatibility check passed on 2026-11-07.
-This record does not complete issue #34's BigRAE-owned range qualification.
+The subsequent [BigRAE-owned range qualification](2026-11-07-gcp-bigrae.md) passed separately.
 Raw qualification evidence remains private and separate from study data.
 
 ## Selected inputs
@@ -49,13 +49,14 @@ Flush and stop returned successful receipts.
 The daemon exited, the caller-owned target stopped, and normal module unload succeeded.
 All retained evidence file hashes matched their recorded values.
 
-## Remaining qualification
+## Boundary of the native check
 
 The tenant accepted the worker's isolated compatibility probe.
 It also installed the qualification pack with passed conformance.
 These results do not establish a realized BigRAE range.
 
-Issue #34 still requires the signed test release, administrator image binding,
-BigRAE-owned realization and adapter execution, evidence collection, and verified range destruction.
+Those live range steps were pending at this native checkpoint.
+The subsequent BigRAE record covers the signed release, image binding, realization,
+adapter execution, evidence collection, and verified range destruction.
 The native check covers the four memory operations above.
 It does not establish broader attack coverage or produce paper study results.

@@ -67,8 +67,8 @@ host sysfs. The test container alone enables SYS_PTRACE and removes AppArmor's
 sysfs restriction for this fake filesystem. It loads no real kernel module.
 Configuration, idempotent retry, verification, wrong-release and wrong-enforcement
 readback, and artifact tampering are checked. This fixture cannot enter the worker
-image or adapter wheel. Live sensor/attack qualification remains issue #34 and is
-outside these integration tests.
+image or adapter wheel. The [live GCP qualification record](../../qualification/bigrae/records/2026-11-07-gcp-bigrae.md)
+covers real guest execution separately from these integration tests.
 
 ## Configuration
 
@@ -128,4 +128,5 @@ State is private to `/run/owlbear-<operation UUID>`, mode 0700. Retries inspect
 existing state without replacing processes, sockets or evidence. Incomplete or
 incompatible state fails for inspection. Core guest destruction owns cleanup;
 the adapter returns no cleanup actions and contains no infrastructure lifecycle,
-cloud access, study behavior or evidence upload. Live qualification is issue #34.
+cloud access, study behavior or evidence upload.
+See the live GCP qualification record for the tested inputs, outcomes, cleanup, and limits.

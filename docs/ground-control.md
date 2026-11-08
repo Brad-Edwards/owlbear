@@ -13,7 +13,7 @@ It also provides a manual repair trigger that accepts a merged PR number.
 It checks out the immutable merge revision with checkout credentials disabled.
 It installs Ground Control 1.10.0 from its private release archive and verifies the archive's SHA-256.
 Package installation scripts are disabled.
-The finalizer step alone receives the workflow token, whose only write permission is `issues: write`.
+The finalizer receives the workflow token as `GH_TOKEN`; its only write permission is `issues: write`.
 The download step alone receives the separate read-only release credential.
 
 The workflow calls `grndctl finalize-merged-pr`; it contains no separate issue-closing implementation.

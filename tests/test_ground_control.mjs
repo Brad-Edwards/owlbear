@@ -72,7 +72,7 @@ test('pull-request CI uses only the public parser without release credentials', 
   assert.equal(require('js-yaml/package.json').version, '4.3.2');
 });
 
-test('the workflow token reaches only the canonical finalizer command', () => {
+test('the finalizer and download use separate explicit token bindings', () => {
   const final = job.steps.at(-1);
   assert.equal(final.run, 'grndctl finalize-merged-pr --pr "$PR"');
   assert.deepEqual(final.env, { GH_TOKEN: '${{ github.token }}', PR: '${{ github.event.pull_request.number || inputs.pr }}' });

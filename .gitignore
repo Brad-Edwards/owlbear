@@ -47,6 +47,8 @@ tests/test_runner
 
 # --- Build system ---
 *.d
+# Ground Control change notes are not compiler dependency directories.
+!/changelog.d/
 *.mod
 *.smod
 .cache/

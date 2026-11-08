@@ -1,3 +1,4 @@
+# Ground Control's restored configuration format. See docs/ground-control.md.
 schema_version: 1
 project: owlbear
 github_repo: Brad-Edwards/owlbear
@@ -18,6 +19,7 @@ workflow:
 
 docs:
   architecture_overview: README.md
+  workflow_reference: docs/ground-control.md
 
 example_paths:
   source: daemon/
@@ -30,7 +32,7 @@ cross_cutting_concerns:
     Logging: daemon/log.h; preserve versioned experiment output and evidence identities.
     Tests: C unit binaries under tests/, Python unittest modules for experiment interfaces and research artifacts, and separately installed SDK/adapter tests under adapters/bigrae/tests/.
     Verification: run targeted checks locally; CI owns full suites, ARM64 builds, Terraform validation, artifact reproducibility, and worker integration. Live runtime qualification needs an authorized disposable ARM64 range.
-    Deployment: manual AWS provisioning follows deploy/terraform/README.md; CI does not provision resources or access remote state.
+    Deployment: manual AWS provisioning follows deploy/terraform/README.md; GCP qualification follows deploy/gcp/README.md. CI does not provision resources or access remote state.
     Privacy: never read .env or secret files, or include their contents in logs, commits, or review context. Transfers and external services require established repository use or explicit authorization.
 
 architecture:

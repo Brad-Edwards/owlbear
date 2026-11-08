@@ -1,0 +1,61 @@
+name: Ground Control Phase E
+run-name: Ground Control Phase E for PR ${{ github.event.pull_request.number || inputs.pr }}
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Merged pull request number to finalize
+        required: true
+        type: string
+
+concurrency:
+  group: gc-phase-e-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  issues: write
+
+jobs:
+  finalize:
+    if: ${{ github.event.pull_request.merged == true || (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ground-control
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.4'
+      - name: Download the pinned Ground Control release
+        env:
+          GH_TOKEN: ${{ secrets.GROUND_CONTROL_RELEASE_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo '::error::Configure GROUND_CONTROL_RELEASE_TOKEN in the ground-control environment with read-only access to the Ground Control release repository.'
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/ground-control"
+          gh release download v1.10.0 --repo autarchy-ai/Ground-Control \
+            --pattern grndctl-1.10.0.tgz --dir "$RUNNER_TEMP/ground-control"
+          echo "f98204489a9888bdd740b9274c40ea9747482db7e5b9e2e1f7fcf5c8a157e1ba  $RUNNER_TEMP/ground-control/grndctl-1.10.0.tgz" | sha256sum --check
+      - name: Install the verified Ground Control release
+        run: |
+          npm install --global --ignore-scripts --no-audit --no-fund --prefix "$RUNNER_TEMP/ground-control" \
+            "$RUNNER_TEMP/ground-control/grndctl-1.10.0.tgz"
+          echo "$RUNNER_TEMP/ground-control/bin" >> "$GITHUB_PATH"
+      - name: Finalize the merged delivery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+        run: grndctl finalize-merged-pr --pr "$PR"

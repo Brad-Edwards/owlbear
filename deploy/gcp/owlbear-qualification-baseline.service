@@ -1,0 +1,13 @@
+[Unit]
+Description=Caller-owned Owlbear baseline before protection
+After=local-fs.target
+Before=owlbear-qualification-target.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+StateDirectory=owlbear-qualification
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 /opt/owlbear/qualification/baseline.py --release /opt/owlbear/releases/qualification --output /var/lib/owlbear-qualification/baseline.json
+RemainAfterExit=yes

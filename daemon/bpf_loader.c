@@ -26,20 +26,6 @@
 #include "owlbear_kprobe.skel.h"
 #include "owlbear_net.skel.h"
 
-/*
- * BPF event structure — must match owlbear_common.bpf.h.
- * Duplicated here because the BPF header uses vmlinux.h types.
- */
-struct owl_bpf_event {
-	uint64_t timestamp_ns;
-	uint32_t event_type;
-	uint32_t severity;
-	uint32_t pid;
-	uint32_t target_pid;
-	char     comm[16];
-	char     detail[48];
-};
-
 struct owl_bpf_ctx {
 	struct owlbear_lsm_bpf    *lsm;
 	struct owlbear_trace_bpf  *trace;
@@ -60,78 +46,6 @@ struct owl_bpf_ctx {
 	owl_bpf_event_cb event_cb;
 	void            *event_cb_ctx;
 };
-
-/* -------------------------------------------------------------------------
- * Pure conversion function (testable without BPF)
- * ----------------------------------------------------------------------- */
-
-int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
-			   struct owlbear_event *out)
-{
-	if (!bpf_data || !out)
-		return -1;
-
-	if (bpf_size < sizeof(struct owl_bpf_event))
-		return -1;
-
-	const struct owl_bpf_event *bev = bpf_data;
-
-	memset(out, 0, sizeof(*out));
-	out->timestamp_ns = bev->timestamp_ns;
-	out->event_type = bev->event_type;
-	out->severity = bev->severity;
-	out->source = OWL_SRC_EBPF;
-	out->pid = bev->pid;
-	out->target_pid = bev->target_pid;
-	memcpy(out->comm, bev->comm, sizeof(out->comm));
-
-	/*
-	 * Map the detail string into the appropriate payload union
-	 * based on event type.
-	 */
-	switch (bev->event_type) {
-	case OWL_EVENT_PTRACE_ATTEMPT:
-	case OWL_EVENT_PROC_MEM_ACCESS:
-	case OWL_EVENT_VM_READV_ATTEMPT:
-	case OWL_EVENT_VM_WRITEV_ATTEMPT:
-	case OWL_EVENT_MPROTECT_EXEC:
-		out->payload.memory.caller_pid = bev->pid;
-		memcpy(out->payload.memory.caller_comm, bev->comm,
-		       sizeof(out->payload.memory.caller_comm) < sizeof(bev->comm)
-		       ? sizeof(out->payload.memory.caller_comm)
-		       : sizeof(bev->comm));
-		break;
-
-	case OWL_EVENT_MODULE_LOAD:
-		memcpy(out->payload.module.name, bev->detail,
-		       sizeof(out->payload.module.name) < sizeof(bev->detail)
-		       ? sizeof(out->payload.module.name)
-		       : sizeof(bev->detail));
-		break;
-
-	case OWL_EVENT_NET_CONNECT:
-	case OWL_EVENT_NET_SEND:
-		memcpy(&out->payload.network.dst_addr, bev->detail + 0, 4);
-		memcpy(&out->payload.network.dst_port, bev->detail + 4, 2);
-		memcpy(&out->payload.network.protocol, bev->detail + 6, 2);
-		memcpy(&out->payload.network.bytes,    bev->detail + 8, 8);
-		memcpy(out->payload.network.comm, bev->comm,
-		       sizeof(out->payload.network.comm) < sizeof(bev->comm)
-		       ? sizeof(out->payload.network.comm)
-		       : sizeof(bev->comm));
-		break;
-
-	default:
-		/* Copy detail into raw payload as fallback */
-		memcpy(out->payload.raw, bev->detail,
-		       sizeof(out->payload.raw) < sizeof(bev->detail)
-		       ? sizeof(out->payload.raw)
-		       : sizeof(bev->detail));
-		break;
-	}
-
-	return 0;
-}
 
 /* -------------------------------------------------------------------------
  * Ring buffer callback — invoked by libbpf for each event

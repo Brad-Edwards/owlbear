@@ -1,0 +1,29 @@
+name: owlbear-arm64-qualification
+description: One disposable synthetic guest with an administrator-selected ARM64 boot image.
+nodes:
+  lan:
+    type: switch
+  guest:
+    type: compute
+    os: linux
+    os_distribution: ubuntu
+    os_version: "24.04"
+    source: {name: ubuntu}
+    resources: {ram: 8 gib, cpu: 2}
+    services:
+      - {port: 22, name: ssh}
+infrastructure:
+  lan:
+    count: 1
+    properties: {cidr: 10.50.0.0/24, gateway: 10.50.0.1}
+  guest:
+    count: 1
+    links: [lan]
+    properties:
+      - lan: 10.50.0.20
+realization:
+  constraints:
+    - field_pointer: /nodes/guest
+      concern: compute-substrate
+      posture: exact
+      domain: {kind: exact, value: virtual-machine}

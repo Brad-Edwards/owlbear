@@ -141,8 +141,9 @@ static __always_inline int emit_event(__u32 type, __u32 severity,
 	ev->target_pid = target_pid;
 	bpf_get_current_comm(ev->comm, sizeof(ev->comm));
 
+	__builtin_memset(ev->detail, 0, sizeof(ev->detail));
 	if (detail)
-		__builtin_memcpy(ev->detail, detail, sizeof(ev->detail));
+		bpf_probe_read_kernel_str(ev->detail, sizeof(ev->detail), detail);
 
 	bpf_ringbuf_submit(ev, 0);
 

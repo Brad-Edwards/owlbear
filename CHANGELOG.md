@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.7.0] - 2026-11-10
+### Added
+- GCP ARM64 adapter qualification: caller-owned PID file, qualification pack,
+  GCP image preparation and independent baseline/protected memory checks.
+
+### Fixed
+- Typed BPF exec records; production and tests use the same BPF event converter.
+
+## [2.7.0] - 2026-11-09
 
 ### Added
 - Versioned ARM64 research artifacts with build manifests, payload checksums and
@@ -19,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`docs/experiment-interface.md`).
 - Independently packaged BigRAE runtime adapter, with a hash-locked ARM64 worker
   image and container integration tests (`adapters/`).
-- GCP ARM64 adapter qualification: caller-owned PID file, qualification pack,
-  GCP image preparation and independent baseline/protected memory checks.
 - `SECURITY.md` with private vulnerability reporting.
 
 ### Changed
@@ -29,9 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Commit hooks check staged file hygiene and credentials only; full test suites
   and artifact verification run in CI.
 - Observe mode also disables Owlbear LSM denials.
-
-### Fixed
-- Typed BPF exec records; production and tests use the same BPF event converter.
 
 ## [2.6.0] - 2026-03-15
 

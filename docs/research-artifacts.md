@@ -81,6 +81,8 @@ that upstream repositories will retain all dependencies.
 Build and unit-test success do not prove runtime readiness, complete sensor
 coverage or attack blocking. Live BigRAE qualification belongs to issues #33–34;
 study execution and resulting data belong to the individual paper repositories.
+The [live qualification boundary](../design/bigrae-qualification.md) defines
+the required identity, independent outcome and teardown evidence for issue #34.
 
 ## Release
 

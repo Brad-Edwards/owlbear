@@ -1,0 +1,66 @@
+# Ground Control's restored configuration format. See docs/ground-control.md.
+schema_version: 1
+project: owlbear
+github_repo: Brad-Edwards/owlbear
+
+workflow:
+  base_branch: dev
+  test_command: make test
+  completion_command: make test
+  # Owlbear's repository checks are its existing hygiene and credential hooks.
+  policy_command: pre-commit run --hook-stage pre-commit
+  precommit_command: pre-commit run --hook-stage pre-commit
+  codex_review:
+    pre_push_cap: 1
+  pr_title:
+    types: [feat, fix, docs, chore, refactor, test, build, ci, perf, style, revert]
+    require_scope: false
+    subject_pattern: '^[a-z].*$'
+
+docs:
+  architecture_overview: README.md
+  workflow_reference: docs/ground-control.md
+
+example_paths:
+  source: daemon/
+  test: tests/
+
+cross_cutting_concerns:
+  description: |
+    Runtime: ARM64 Linux kernel module, eBPF programs, and C userspace daemon; Python AWS telemetry receiver and independent BigRAE runtime adapter.
+    Interfaces: shared event and ioctl definitions in include/owlbear_events.h; versioned control and telemetry contracts in design/experiment-interface.md.
+    Logging: daemon/log.h; preserve versioned experiment output and evidence identities.
+    Tests: C unit binaries under tests/, Python unittest modules for experiment interfaces and research artifacts, and separately installed SDK/adapter tests under adapters/bigrae/tests/.
+    Verification: run targeted checks locally; CI owns full suites, ARM64 builds, Terraform validation, artifact reproducibility, and worker integration. Live runtime qualification needs an authorized disposable ARM64 range.
+    Deployment: manual AWS provisioning follows deploy/terraform/README.md; GCP qualification follows deploy/gcp/README.md. CI does not provision resources or access remote state.
+    Privacy: never read .env or secret files, or include their contents in logs, commits, or review context. Transfers and external services require established repository use or explicit authorization.
+
+architecture:
+  vocabulary:
+    patterns:
+      - name: Sensor event pipeline
+        applies_to: kernel and BPF events consumed by the daemon and evaluated by the policy engine
+        example_path: daemon/event_pipeline.c
+      - name: Independent BigRAE adapter
+        applies_to: SDK plans that select a staged release and verify actual guest readiness
+        example_path: adapters/bigrae/src/owlbear_bigrae/__init__.py
+    canonical_helpers:
+      - name: Shared event and ioctl contract
+        path: include/owlbear_events.h
+        purpose: common kernel and userspace event layouts and control operations
+      - name: Research artifact verifier
+        path: scripts/research-artifact.py
+        purpose: verify pinned release identities and payload integrity
+      - name: Daemon logger
+        path: daemon/log.h
+        purpose: consistent userspace diagnostic logging
+    boundary_contract:
+      description: |
+        Kernel and eBPF sensors feed the userspace daemon through the shared event contract.
+        The independent BigRAE adapter depends on the public SDK, returns guest actions, and has no cloud credentials, infrastructure lifecycle, or study behavior.
+        Artifact verification, adapter integration, live qualification, and study results are distinct evidence boundaries; see design/bigrae-adapter.md and docs/research-artifacts.md.
+        Preserve active experiments. Review Terraform plans before applying them. Pull request merge remains user-owned.
+    anti_recommendations:
+      - Do not copy BigRAE platform internals into the independent adapter.
+      - Do not treat a successful build or generated plan as proof of live guest readiness or attack blocking.
+      - Reuse the shared interfaces, artifact verifier, and daemon control API instead of creating parallel implementations.

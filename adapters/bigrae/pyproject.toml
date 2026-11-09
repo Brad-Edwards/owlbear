@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "owlbear-bigrae-adapter"
-version = "0.1.0"
+version = "0.2.1"
 description = "Owlbear release configuration and guest readiness for BigRAE"
 requires-python = ">=3.12"
 license = "MIT"

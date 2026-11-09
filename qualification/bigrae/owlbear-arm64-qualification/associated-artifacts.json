@@ -1,0 +1,97 @@
+{
+  "schema_version": "associated-artifact-manifest/v1",
+  "manifest_id": "owlbear-arm64-qualification-associated-artifacts",
+  "manifest_version": "0.1.1",
+  "canonicalization_profile": "associated-artifact-set/v1",
+  "scope": "scenario",
+  "parent_ref": {
+    "ref_kind": "scenario",
+    "ref_id": "owlbear-arm64-qualification",
+    "ref_version": null,
+    "ref_digest": null,
+    "ref_path": null
+  },
+  "artifacts": {
+    "artifact-0": {
+      "artifact_id": "artifact-0",
+      "role": "other",
+      "media_type": "application/octet-stream",
+      "uri": "raes-environment-pack:/LICENSE",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "0a8f7b51ed72c6822959d5fd90fd4b879f8daebf5e6379660ae31dd5ca4d885d"
+      },
+      "size_bytes": 1069,
+      "created_at": "2026-11-07T00:00:00Z",
+      "source": "owlbear",
+      "satisfies_refs": [],
+      "sensitivity": "public",
+      "description": null
+    },
+    "artifact-1": {
+      "artifact_id": "artifact-1",
+      "role": "other",
+      "media_type": "application/octet-stream",
+      "uri": "raes-environment-pack:/docs/concepts.md",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "e9141fa778b98f910be70d2fbefc309267439de937fc646d27e99acc8bef182f"
+      },
+      "size_bytes": 681,
+      "created_at": "2026-11-07T00:00:00Z",
+      "source": "owlbear",
+      "satisfies_refs": [],
+      "sensitivity": "public",
+      "description": null
+    },
+    "artifact-2": {
+      "artifact_id": "artifact-2",
+      "role": "other",
+      "media_type": "application/octet-stream",
+      "uri": "raes-environment-pack:/docs/provenance-ledger.yaml",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "cf214a5dba4ffa3a60c5eba4982d304ada037859e63a3bebbb9d67fda5ae5673"
+      },
+      "size_bytes": 845,
+      "created_at": "2026-11-07T00:00:00Z",
+      "source": "owlbear",
+      "satisfies_refs": [],
+      "sensitivity": "public",
+      "description": null
+    },
+    "artifact-3": {
+      "artifact_id": "artifact-3",
+      "role": "other",
+      "media_type": "application/octet-stream",
+      "uri": "raes-environment-pack:/pack.yaml",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "9e3be5bfe075f28afc1f3a94495517820353cf8f643b2ffe6259bb03ebecf6d0"
+      },
+      "size_bytes": 327,
+      "created_at": "2026-11-07T00:00:00Z",
+      "source": "owlbear",
+      "satisfies_refs": [],
+      "sensitivity": "public",
+      "description": null
+    },
+    "artifact-4": {
+      "artifact_id": "artifact-4",
+      "role": "other",
+      "media_type": "application/octet-stream",
+      "uri": "raes-environment-pack:/sdl/owlbear-arm64-qualification.sdl.yaml",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "247822e42a13ed3899738f7cdfcf834e28a9a6f74b22f4f9c8a16c5bc40a6369"
+      },
+      "size_bytes": 698,
+      "created_at": "2026-11-07T00:00:00Z",
+      "source": "owlbear",
+      "satisfies_refs": [],
+      "sensitivity": "public",
+      "description": null
+    }
+  },
+  "set_digest": "sha256:f495a76b3ddcb2e83fd168794bb8c36827772a72b2d7f925434d71ec8399007a"
+}

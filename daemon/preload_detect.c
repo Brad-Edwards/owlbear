@@ -6,6 +6,7 @@
  * LD_PRELOAD variable. Used by the event pipeline on exec events.
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -66,8 +67,12 @@ int owl_check_preload_env(pid_t pid, char *value_out, size_t value_len)
 			usleep(50000); /* 50ms backoff */
 
 		int fd = open(path, O_RDONLY);
-		if (fd < 0)
+		if (fd < 0) {
+			/* An exited process cannot become ready; its PID may be reused. */
+			if (errno == ENOENT || errno == ESRCH)
+				return -1;
 			continue;
+		}
 
 		char buf[ENVIRON_MAX_SIZE];
 		ssize_t n = read(fd, buf, sizeof(buf));

@@ -67,6 +67,7 @@ incompatible changes require a new schema identifier.
 | Field | Type and meaning |
 | --- | --- |
 | schema | constant `owlbear.control.v1` |
+| build | embedded `owlbear.build/v1` identity, identical to `owlbeard --version` |
 | ok | boolean, command completed |
 | ready | boolean, loop ready, target alive, kernel readback matches, all requested BPF groups attached/configured, evidence stream healthy |
 | pid, target_pid | positive integer, daemon and requested target |

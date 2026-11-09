@@ -3,12 +3,13 @@ import argparse
 import base64
 from importlib.resources import files
 import json
+from pathlib import PurePosixPath
 import re
 
 from bigrae_adapter_sdk.runtime import GuestAction, PluginManifest, RuntimePlan, decode_message
 
 PARAMETERS = ["configuration"]
-VERSION = "0.1.0"
+VERSION = "0.2.1"
 
 
 def configuration(raw):
@@ -28,8 +29,13 @@ def configuration(raw):
             raise ValueError("invalid release identity")
     if value["release"].rsplit("/", 1)[-1] in {".", ".."}:
         raise ValueError("invalid release path")
-    if type(value["target_pid"]) is not int or not 1 < value["target_pid"] <= 2147483647:
-        raise ValueError("target must be an explicit process PID")
+    target = value["target_pid"]
+    if type(target) is int:
+        if not 1 < target <= 2147483647:
+            raise ValueError("target must be an explicit process PID")
+    elif (not isinstance(target, str) or not re.fullmatch(r"/run/[a-zA-Z0-9._/-]{1,240}\.pid", target)
+          or str(PurePosixPath(target)) != target or any(part in (".", "..") for part in target.split("/"))):
+        raise ValueError("target must be a process PID or canonical /run PID file")
     if type(value["enforce"]) is not bool:
         raise ValueError("enforce must be boolean")
     sensors = value["sensors"]

@@ -47,6 +47,8 @@ tests/test_runner
 
 # --- Build system ---
 *.d
+# Ground Control change notes are not compiler dependency directories.
+!/changelog.d/
 *.mod
 *.smod
 .cache/
@@ -79,6 +81,10 @@ platform/api/*.zip
 *.log
 *.pid
 core
+
+# Local credentials and environment settings
+.env
+.env.*
 
 # --- Executables (generic) ---
 *.exe

@@ -27,6 +27,11 @@ requests and timeouts, no shell evaluation. Evidence files are created
 exclusively with mode 0600. Socket commands execute serially in the event loop.
 Disconnects cannot terminate the daemon. No new external processing/storage.
 
+Exec-event preload inspection must not wait for an exited process.
+An absent process cannot become readable through a retry; its PID can be reused.
+Return immediately on ENOENT or ESRCH, while preserving retries for transient reads.
+This prevents obsolete exec events from delaying control requests.
+
 Invariants checked by targeted tests: v1 replies parse as JSON; malformed
 requests fail; sensor masks reject unknown groups; event strings cannot break
 JSON; failed writes prevent readiness; flush acknowledges durable local output;

@@ -1,6 +1,6 @@
 # Owlbear BigRAE runtime adapter
 
-Independent wheel `owlbear-bigrae-adapter==0.1.0`, entry point `owlbear` in
+Independent wheel `owlbear-bigrae-adapter==0.2.1`, entry point `owlbear` in
 `bigrae.runtime.plugins`, using `bigrae-adapter-sdk[runtime]==0.1.0`.
 The worker returns SDK plans; BigRAE authorizes targets and executes guest actions.
 An installation inspection or successful plan does not prove guest readiness.
@@ -67,8 +67,8 @@ host sysfs. The test container alone enables SYS_PTRACE and removes AppArmor's
 sysfs restriction for this fake filesystem. It loads no real kernel module.
 Configuration, idempotent retry, verification, wrong-release and wrong-enforcement
 readback, and artifact tampering are checked. This fixture cannot enter the worker
-image or adapter wheel. Live sensor/attack qualification remains issue #34 and is
-outside these integration tests.
+image or adapter wheel. The [live GCP qualification record](../../qualification/bigrae/records/2026-11-07-gcp-bigrae.md)
+covers real guest execution separately from these integration tests.
 
 ## Configuration
 
@@ -94,7 +94,12 @@ or transfers. All release files and ancestors must be root-owned and not writabl
 by others. Use a trusted manifest hash from the intended release. The guest needs
 ARM64 Linux, the exact kernel, matching libraries, Python 3, kmod (`insmod`),
 binutils (`readelf`) and root guest execution. The isolated worker remains unprivileged.
-The caller starts and owns the target process. No attack or game behavior is built
+The caller starts and owns the target process.
+For a newly realized guest, `target_pid` can instead be a canonical PID-file path
+such as `/run/owlbear-qualification/target.pid`. The file and its ancestors must
+be root-owned and not writable by other users. The adapter reads a bounded
+integer and records the process start time. Retry and verification
+refuse a changed process identity, including PID reuse. No attack or game behavior is built
 in. Empty `sensors` disables BPF groups; kernel and daemon checks remain active.
 Parameters are encoded as JSON data, never interpolated into shell commands.
 
@@ -111,7 +116,9 @@ the selected ELF. Guests without readable module build notes fail explicitly.
 timeout and bounded output. It checks realized PID, attachments and enforcement,
 all three daemon initialization results (signature loading, code-integrity and vDSO
 baselines), output health and zero known kernel drops. Unknown BPF loss remains
-unknown. The running daemon executable must resolve to the selected release.
+unknown. The private control socket authenticates its PID and UID with SO_PEERCRED.
+Health reports the daemon’s embedded build identity, which must match the release.
+External `/proc/<daemon>/exe` inspection is denied by active self-protection.
 Readiness polling has a 15-second deadline; guest actions have a 120-second host
 limit and subprocess deadlines. Successful execution prints
 `owlbear.bigrae.readiness/v1` with the build identity and actual health response.
@@ -121,4 +128,5 @@ State is private to `/run/owlbear-<operation UUID>`, mode 0700. Retries inspect
 existing state without replacing processes, sockets or evidence. Incomplete or
 incompatible state fails for inspection. Core guest destruction owns cleanup;
 the adapter returns no cleanup actions and contains no infrastructure lifecycle,
-cloud access, study behavior or evidence upload. Live qualification is issue #34.
+cloud access, study behavior or evidence upload.
+See the live GCP qualification record for the tested inputs, outcomes, cleanup, and limits.

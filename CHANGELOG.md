@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-10
+
 ### Added
 - GCP ARM64 adapter qualification: caller-owned PID file, qualification pack,
   GCP image preparation and independent baseline/protected memory checks.

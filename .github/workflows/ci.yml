@@ -117,7 +117,11 @@ jobs:
           deb [arch=arm64] http://ports.ubuntu.com/ $(lsb_release -cs)-updates main universe
           ARMSRC
           sudo apt-get update -qq
-          cat /etc/apt/apt-mirrors.txt; apt-get install -s --allow-downgrades --no-install-recommends gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross libncurses-dev:arm64 | grep -E '^Inst' | head -80
+          apt-get --version | head -1
+          P="gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross libncurses-dev:arm64"
+          echo SOLVER3; apt-get install -s --no-install-recommends $P 2>&1 | grep -E 'upgraded,|^E:' || true
+          echo INTERNAL; apt-get install -s -o APT::Solver=internal --no-install-recommends $P 2>&1 | grep -E 'upgraded,|^E:' || true
+          echo ALLOWED; apt-get install -s --allow-downgrades --no-install-recommends $P 2>&1 | grep -E '^Inst' | awk '{gsub(/[][]/,"",$3); gsub(/[()]/,"",$4); if ($3 != "" && $3 != $4) print "VERSION-CHANGE", $2, $3, $4}' | head
           sudo apt-get install -y --no-install-recommends \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             libc6-dev-arm64-cross \

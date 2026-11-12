@@ -101,7 +101,10 @@ jobs:
 
   cross-compile:
     name: ARM64 cross-compile
-    runs-on: ubuntu-latest
+    # Pinned: on the ubuntu-latest 26.04 image, the installed amd64 packages differ
+    # from the archive's copies of the same versions, so adding arm64 forces
+    # reinstalls that apt reports as downgrades and refuses.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 

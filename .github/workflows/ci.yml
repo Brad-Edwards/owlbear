@@ -117,6 +117,7 @@ jobs:
           deb [arch=arm64] http://ports.ubuntu.com/ $(lsb_release -cs)-updates main universe
           ARMSRC
           sudo apt-get update -qq
+          ls /etc/apt/sources.list.d/; apt-cache policy libgcc-s1 libgcc-s1:arm64 libncurses6 libncurses6:arm64 gcc-16-base | head -60
           sudo apt-get install -y --no-install-recommends \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             libc6-dev-arm64-cross \

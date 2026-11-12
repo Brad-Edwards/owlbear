@@ -101,7 +101,10 @@ jobs:
 
   cross-compile:
     name: ARM64 cross-compile
-    runs-on: ubuntu-latest
+    # Pinned: on the ubuntu-latest 26.04 image, the installed amd64 packages differ
+    # from the archive's copies of the same versions, so adding arm64 forces
+    # reinstalls that apt reports as downgrades and refuses.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -117,11 +120,6 @@ jobs:
           deb [arch=arm64] http://ports.ubuntu.com/ $(lsb_release -cs)-updates main universe
           ARMSRC
           sudo apt-get update -qq
-          apt-get --version | head -1
-          P="gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross libncurses-dev:arm64"
-          echo SOLVER3; apt-get install -s --no-install-recommends $P 2>&1 | grep -E 'upgraded,|^E:' || true
-          echo INTERNAL; apt-get install -s -o APT::Solver=internal --no-install-recommends $P 2>&1 | grep -E 'upgraded,|^E:' || true
-          echo ALLOWED; apt-get install -s --allow-downgrades --no-install-recommends $P 2>&1 | grep -E '^Inst' | awk '{gsub(/[][]/,"",$3); gsub(/[()]/,"",$4); if ($3 != "" && $3 != $4) print "VERSION-CHANGE", $2, $3, $4}' | head
           sudo apt-get install -y --no-install-recommends \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             libc6-dev-arm64-cross \

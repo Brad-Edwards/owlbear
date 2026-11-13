@@ -2,15 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  ground-control:
+    name: Ground Control configuration and Phase E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.23.4'
+      - name: Install the public YAML parser
+        run: npm install --ignore-scripts --no-audit --no-fund --prefix "$RUNNER_TEMP/gc-config-tests" js-yaml@4.3.2
+      - name: Validate schema 1 and finalization boundaries
+        env:
+          YAML_PACKAGE_ROOT: ${{ runner.temp }}/gc-config-tests/node_modules/js-yaml
+        run: node --test tests/test_ground_control.mjs
+
   # -----------------------------------------------------------------------
   # Stage 1: Fast checks (no AWS, no ARM64 hardware)
   # -----------------------------------------------------------------------
@@ -23,6 +38,9 @@ jobs:
 
       - name: Experiment interface integration tests
         run: python3 -m unittest discover -s tests -p test_experiment.py -v
+
+      - name: Qualification caller tests
+        run: python3 -m unittest discover -s tests -p 'test_qualification_*.py' -v
 
       - name: Check shared header compiles
         run: |
@@ -83,7 +101,10 @@ jobs:
 
   cross-compile:
     name: ARM64 cross-compile
-    runs-on: ubuntu-latest
+    # Pinned: on the ubuntu-latest 26.04 image, the installed amd64 packages differ
+    # from the archive's copies of the same versions, so adding arm64 forces
+    # reinstalls that apt reports as downgrades and refuses.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 

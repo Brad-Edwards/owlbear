@@ -46,6 +46,12 @@ int owl_bpf_event_convert(const void *bpf_data, size_t bpf_size,
 	memcpy(out->comm, bev->comm, sizeof(out->comm));
 
 	switch (bev->event_type) {
+	case OWL_EVENT_PROCESS_EXEC:
+		memcpy(&out->payload.process.parent_pid, bev->detail, 4);
+		memcpy(&out->payload.process.uid, bev->detail + 4, 4);
+		memcpy(out->payload.process.filename, bev->detail + 8, 40);
+		break;
+
 	case OWL_EVENT_PTRACE_ATTEMPT:
 	case OWL_EVENT_PROC_MEM_ACCESS:
 	case OWL_EVENT_VM_READV_ATTEMPT:

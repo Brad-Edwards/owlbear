@@ -71,6 +71,20 @@ TEST(bpf_convert_module_load_event) {
 	ASSERT_STR_EQ(out.payload.module.name, "evil_module");
 }
 
+TEST(bpf_convert_process_identity) {
+	struct test_bpf_event bev = {0};
+	struct owlbear_event out;
+	uint32_t parent = 4321, uid = 1000;
+	bev.event_type = OWL_EVENT_PROCESS_EXEC;
+	memcpy(bev.detail, &parent, 4);
+	memcpy(bev.detail + 4, &uid, 4);
+	memcpy(bev.detail + 8, "/usr/bin/example", 16);
+	ASSERT_EQ(owl_bpf_event_convert(&bev, sizeof(bev), &out), 0);
+	ASSERT_EQ(out.payload.process.parent_pid, parent);
+	ASSERT_EQ(out.payload.process.uid, uid);
+	ASSERT_STR_EQ(out.payload.process.filename, "/usr/bin/example");
+}
+
 TEST(bpf_convert_vm_readv_event) {
 	struct test_bpf_event bev;
 	struct owlbear_event out;
@@ -241,6 +255,7 @@ int main(void)
 
 	RUN_TEST(bpf_convert_ptrace_event);
 	RUN_TEST(bpf_convert_module_load_event);
+	RUN_TEST(bpf_convert_process_identity);
 	RUN_TEST(bpf_convert_vm_readv_event);
 	RUN_TEST(bpf_convert_mprotect_event);
 	RUN_TEST(bpf_convert_dev_mem_access_event);

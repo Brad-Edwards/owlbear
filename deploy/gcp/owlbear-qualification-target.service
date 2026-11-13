@@ -1,0 +1,19 @@
+[Unit]
+Description=Caller-owned synthetic Owlbear qualification target
+After=local-fs.target owlbear-qualification-baseline.service
+Requires=owlbear-qualification-baseline.service
+
+[Service]
+Type=exec
+User=root
+UMask=0077
+RuntimeDirectory=owlbear-qualification
+RuntimeDirectoryMode=0700
+ExecStartPre=/usr/bin/test ! -e /tmp/owlbear-game.info
+ExecStartPre=/usr/bin/test ! -L /tmp/owlbear-game.info
+ExecStart=/opt/owlbear/releases/qualification/game/owlbear-game --no-curses
+ExecStartPost=/bin/sh -c 'printf "%%s\n" "$MAINPID" > /run/owlbear-qualification/target.pid'
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

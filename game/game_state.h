@@ -63,6 +63,7 @@ struct game_functions {
  * ----------------------------------------------------------------------- */
 
 #define GAME_STATE_MAGIC 0x4F574C42  /* "OWLB" */
+#define GAME_CANARY_BYTES 64
 
 struct game_state {
 	uint32_t             magic;      /* GAME_STATE_MAGIC — scan target */
@@ -70,6 +71,10 @@ struct game_state {
 	struct game_player   player;
 	struct game_functions funcs;
 	uint64_t             state_addr; /* Address of this struct (for cheats) */
+	/* Secret that a study gives the game for one run; zero when none is given.
+	 * It exists only in this memory. Last, so earlier offsets do not move. */
+	uint8_t              canary[GAME_CANARY_BYTES];
+	uint32_t             canary_len;
 };
 
 /* -------------------------------------------------------------------------

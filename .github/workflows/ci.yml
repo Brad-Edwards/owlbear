@@ -42,6 +42,12 @@ jobs:
       - name: Qualification caller tests
         run: python3 -m unittest discover -s tests -p 'test_qualification_*.py' -v
 
+      - name: Game canary tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libncurses-dev
+          python3 -m unittest discover -s tests -p test_game_canary.py -v
+
       - name: Check shared header compiles
         run: |
           gcc -std=c11 -Wall -Wextra -Werror -fsyntax-only \

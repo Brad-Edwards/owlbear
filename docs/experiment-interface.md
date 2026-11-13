@@ -6,6 +6,13 @@ interactive ncurses default. Controllers own the processes they start and
 must wait for them to exit. Loading/unloading the module remains explicit.
 Only one daemon may control a module at a time.
 
+A controller can give the game a secret canary with `--canary-fd FD`. The game
+reads up to 64 bytes from that descriptor at start, closes it, and keeps the
+canary only in its state structure, after all other fields. The game does not
+write the canary to a file, a log, or its output. The game exits with status 1
+if the descriptor gives no bytes. A participant that reports the canary has
+read the game's memory.
+
 Run this example from a root shell (device and BPF access require privileges):
 
 ```sh

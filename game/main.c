@@ -197,6 +197,23 @@ static void game_tick(void)
 
 static volatile sig_atomic_t g_running = 1;
 
+/* Read the run's canary from fd and close it. The canary stays only in g_state. */
+static int read_canary(int fd)
+{
+	ssize_t n;
+
+	do {
+		n = read(fd, g_state.canary, sizeof(g_state.canary));
+	} while (n < 0 && errno == EINTR);
+	close(fd);
+	if (n <= 0) {
+		fprintf(stderr, "owlbear-game: no canary on fd %d\n", fd);
+		return -1;
+	}
+	g_state.canary_len = (uint32_t)n;
+	return 0;
+}
+
 static void signal_handler(int sig)
 {
 	(void)sig;
@@ -314,13 +331,17 @@ int main(int argc, char *argv[])
 {
 	bool use_curses = true;
 
+	int canary_fd = -1;
+
 	/* Simple arg check */
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--no-curses") == 0)
 			use_curses = false;
+		else if (strcmp(argv[i], "--canary-fd") == 0 && i + 1 < argc)
+			canary_fd = atoi(argv[++i]);
 		else if (strcmp(argv[i], "--help") == 0 ||
 			 strcmp(argv[i], "-h") == 0) {
-			printf("Usage: %s [--no-curses]\n", argv[0]);
+			printf("Usage: %s [--no-curses] [--canary-fd FD]\n", argv[0]);
 			return 0;
 		}
 	}
@@ -330,6 +351,8 @@ int main(int argc, char *argv[])
 
 	/* Initialize game */
 	game_init();
+	if (canary_fd >= 0 && read_canary(canary_fd) != 0)
+		return 1;
 
 	/* Print critical info to stderr (visible even in curses mode) */
 	fprintf(stderr, "owlbear-game: PID=%d state_addr=0x%lx size=%zu\n",
